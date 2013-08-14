@@ -1,0 +1,258 @@
+
+
+
+#include <MIDI.h>
+/*
+8/9/13: 
+
+Things this sketch does: 
+------------------------------------
+1. Program change up/down
+  a.  note 60 is up, note 62 is down
+
+2. "Mute"  parts 1-7b (sets the volume to zero)
+  a.  note 64 is part 1
+  b.  note 66 is part 2
+  c.  note 68 is part 3
+  d.  note 70 is part 4
+  e.  note 72 is part 5
+  f.  note 74 is part 6
+  g.  note 76 is part 6a
+  h.  note 78 is part 6b
+  i.  note 79 is part 7a
+  j.  note 80 is part 7b
+
+
+TO DO:
+----------------------------
+1.  Start/stop via trigger pad
+
+if note X is received
+sendRealTime (Start/Stop)? 
+
+2.  MIDI file reader/send out, get sync...
+
+ */
+byte P = 0;  //program or patch number
+byte M1 = 0;  //mute for part 1 off
+byte M2 = 0;  //mute for part 2 off
+byte M3 = 0;  //mute for part 3 off
+byte M4 = 0;  //mute for part 4 off
+byte M5 = 0;  //mute for part 5 off
+byte M6a = 0;  //mute for part 6a off
+byte M6b = 0;  //mute for part 6b off
+byte M7a = 0;  //mute for part 7a off
+byte M7b = 0;  //mute for part 7b off
+
+void HandleClock() {
+
+  //do stuff ?
+
+}
+
+void HandleNoteOn (byte channel, byte note, byte velocity){
+  //if note X is sent, send program change control to go up
+  //todo: 
+  if (note == 60 and velocity >0){   //need to get the actual note number that I'll assign */
+    if (P == 127){
+      P=0;
+      MIDI.sendProgramChange(P,10);
+    }
+    else
+    {
+      P++;
+      MIDI.sendProgramChange(P,10);
+    }
+  }
+
+  //if note Y is sent, send program change control to go down
+  if (note == 62 and velocity>0){  //need to get the actual note number that I'll assign
+    if (P== 0){
+      P=127;
+      MIDI.sendProgramChange(P,10);
+    }
+    else {
+      P--;
+      MIDI.sendProgramChange(P,10);
+    }
+  }
+
+  //if note Z is sent, send nrpn to set volume to zero (part mute)
+//mute for part 1
+  if (note == 64 and velocity>0) { 
+    //use sendcontrolchange? to mute part 1 only
+    if (M1==0) {
+      MIDI.sendControlChange(99,5,10);
+      MIDI.sendControlChange(98,1,10);
+      MIDI.sendControlChange(06,0,10);  //sets level to zero, for part 1
+      //need to toggle it
+      M1=1;
+    }
+    else {
+      MIDI.sendControlChange(99,5,10);
+      MIDI.sendControlChange(98,1,10);
+      MIDI.sendControlChange(06,120,10);
+      M1=0;
+    }
+  }
+  
+  
+   //mute for part 2
+  
+   if (note == 66 and velocity>0) { 
+    if (M2==0) {
+      MIDI.sendControlChange(99,5,10);
+      MIDI.sendControlChange(98,9,10);
+      MIDI.sendControlChange(06,0,10);  //sets level to zero, for part 2
+      //need to toggle it
+      M2=1;
+    }
+    else {
+      MIDI.sendControlChange(99,5,10);
+      MIDI.sendControlChange(98,9,10);
+      MIDI.sendControlChange(06,120,10);
+      M2=0;
+    }
+  }
+
+  //mute for part 3
+     if (note == 68 and velocity>0) { 
+    //use sendcontrolchange? to mute part 1 only
+    if (M3==0) {
+      MIDI.sendControlChange(99,5,10);
+      MIDI.sendControlChange(98,17,10);
+      MIDI.sendControlChange(06,0,10);  //sets level to zero, for part 3
+      //need to toggle it
+      M3=1;
+    }
+    else {
+      MIDI.sendControlChange(99,5,10);
+      MIDI.sendControlChange(98,17,10);
+      MIDI.sendControlChange(06,120,10);
+      M3=0;
+    }
+  }
+  //mute for part 4
+     if (note == 70 and velocity>0) { 
+    //use sendcontrolchange? to mute part 1 only
+    if (M4==0) {
+      MIDI.sendControlChange(99,5,10);
+      MIDI.sendControlChange(98,25,10);
+      MIDI.sendControlChange(06,0,10);  //sets level to zero, for part 1
+      //need to toggle it
+      M4=1;
+    }
+    else {
+      MIDI.sendControlChange(99,5,10);
+      MIDI.sendControlChange(98,25,10);
+      MIDI.sendControlChange(06,120,10);
+      M4=0;
+    }
+  }
+  //mute for part 5
+     if (note == 72 and velocity>0) { 
+    //use sendcontrolchange? to mute part 1 only
+    if (M5==0) {
+      MIDI.sendControlChange(99,5,10);
+      MIDI.sendControlChange(98,33,10);
+      MIDI.sendControlChange(06,0,10);  //sets level to zero, for part 1
+      //need to toggle it
+      M5=1;
+    }
+    else {
+      MIDI.sendControlChange(99,5,10);
+      MIDI.sendControlChange(98,33,10);
+      MIDI.sendControlChange(06,120,10);
+      M5=0;
+    }
+  }
+  //mute for 6a
+     if (note == 74 and velocity>0) { 
+    //use sendcontrolchange? to mute part 1 only
+    if (M6a==0) {
+      MIDI.sendControlChange(99,5,10);
+      MIDI.sendControlChange(98,41,10);
+      MIDI.sendControlChange(06,0,10);  //sets level to zero, for part 1
+      //need to toggle it
+      M6a=1;
+    }
+    else {
+      MIDI.sendControlChange(99,5,10);
+      MIDI.sendControlChange(98,41,10);
+      MIDI.sendControlChange(06,120,10);
+      M6a=0;
+    }
+  }
+  //mute for 6b
+     if (note == 76 and velocity>0) { 
+    //use sendcontrolchange? to mute part 1 only
+    if (M6b==0) {
+      MIDI.sendControlChange(99,5,10);
+      MIDI.sendControlChange(98,49,10);
+      MIDI.sendControlChange(06,0,10);  //sets level to zero, for part 1
+      //need to toggle it
+      M6b=1;
+    }
+    else {
+      MIDI.sendControlChange(99,5,10);
+      MIDI.sendControlChange(98,49,10);
+      MIDI.sendControlChange(06,120,10);
+      M6b=0;
+    }
+  }
+  //mute for 7a
+     if (note == 78 and velocity>0) { 
+    //use sendcontrolchange? to mute part 1 only
+    if (M7a==0) {
+      MIDI.sendControlChange(99,5,10);
+      MIDI.sendControlChange(98,57,10);
+      MIDI.sendControlChange(06,0,10);  //sets level to zero, for part 1
+      //need to toggle it
+      M7a=1;
+    }
+    else {
+      MIDI.sendControlChange(99,5,10);
+      MIDI.sendControlChange(98,57,10);
+      MIDI.sendControlChange(06,120,10);
+      M7a=0;
+    }
+  }
+  //mute for 7b
+     if (note == 80 and velocity>0) { 
+    if (M7b==0) {
+      MIDI.sendControlChange(99,5,10);
+      MIDI.sendControlChange(98,65,10);
+      MIDI.sendControlChange(06,0,10);  //sets level to zero, for part 1
+      //need to toggle it
+      M7b=1;
+    }
+    else {
+      MIDI.sendControlChange(99,5,10);
+      MIDI.sendControlChange(98,65,10);
+      MIDI.sendControlChange(06,120,10);
+      M7b=0;
+    }
+  }
+
+  //done.
+}
+
+void setup() {
+
+  MIDI.begin(MIDI_CHANNEL_OMNI);
+  MIDI.turnThruOff();
+  MIDI.setHandleNoteOn(HandleNoteOn);
+  MIDI.sendProgramChange(P,10);
+   MIDI.setHandleClock ( HandleClock );
+
+}
+
+void loop () {
+
+  MIDI.read(); //is there incoming MIDI?
+
+
+}
+
+
+

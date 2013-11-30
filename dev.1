@@ -1,0 +1,454 @@
+
+#include <SdFat.h>
+
+
+
+#include <MIDIFile.h>
+//#include <MIDIHelper.h>
+//#include <SoftwareSerial.h>
+#include <MIDI.h>
+/*
+8/9/13: 
+ 
+ Things this sketch does: 
+ ------------------------------------
+ 1. Program change up/down
+ a.  note 60 is up, note 62 is down
+ 
+ 2. "Mute"  parts 1-7b (sets the volume to zero)
+ a.  note 64 is part 1
+ b.  note 66 is part 2
+ c.  note 68 is part 3
+ d.  note 70 is part 4
+ e.  note 72 is part 5
+ f.  note 74 is part 6
+ g.  note 76 is part 6a
+ h.  note 78 is part 6b
+ i.  note 79 is part 7a
+ j.  note 80 is part 7b
+ 
+ 
+ TO DO:
+ ----------------------------
+ MIDI  CLock Master
+ 
+ define tempo  (need to decide how I'll set tempo.  could be an LED & dial, but also could be defined by the MIDI file that is played from the SD card).  
+ for testing, I'll use 127bpm
+ clock needs to be sent 24 times per quarter note
+ need a clock to start, so I know when to send a clock signal.  
+ 
+ 
+ */
+//SoftwareSerial SSerial(2, 3);
+#define	DEBUG(x)	Serial.print(x)
+#define	DEBUGX(x)	Serial.print(x, HEX)
+int led = 13;
+
+
+
+#define  SD_SELECT  10
+SdFat	SD;
+MIDIFile SMF;
+
+
+/*  this is the MIDIfile section that handles playing of the MIDI files on the sd card*/
+
+void midiCallback(midi_event *pev)
+// Called by the MIDIFile library when a file event needs to be processed
+// thru the midi communications interface.
+// This callback is set up in the setup() function.
+{
+  if ((pev->data[0] >= 0x80) && (pev->data[0] <= 0xe0))
+  {
+    Serial.write(pev->data[0] | pev->channel);
+    Serial.write(&pev->data[1], pev->size-1);
+  }
+  else
+    Serial.write(pev->data, pev->size);
+
+}
+
+void sysexCallback(sysex_event *pev)
+// Called by the MIDIFile library when a system Exclusive (sysex) file event needs 
+// to be processed thru the midi communications interface. MOst sysex events cannot 
+// really be processed, so we just ignore it here.
+// This callback is set up in the setup() function
+{
+
+}
+
+void midiSilence(void)
+// Turn everything off on every channel.
+// Some midi files are badly behaved and leave notes hanging, so between songs turn
+// off all the notes and sound
+{
+  midi_event	ev;
+
+  // All sound off
+  // When All Sound Off is received all oscillators will turn off, and their volume
+  // envelopes are set to zero as soon as possible.
+  ev.size = 0;
+  ev.data[ev.size++] = 0xb0;
+  ev.data[ev.size++] = 120;
+  ev.data[ev.size++] = 0;
+
+  for (ev.channel = 0; ev.channel < 16; ev.channel++)
+    midiCallback(&ev);
+}
+
+
+
+
+
+
+
+long bpm = 120;
+long tempo = 1000/(bpm/60);
+
+long prevmillis = 0;
+long interval = tempo/24;    //interval is the number of milliseconds defined by tempo formula.
+
+
+
+byte P = 0;  //program or patch number
+byte M1 = 0;  //mute for part 1 off
+byte M2 = 0;  //mute for part 2 off
+byte M3 = 0;  //mute for part 3 off
+byte M4 = 0;  //mute for part 4 off
+byte M5 = 0;  //mute for part 5 off
+byte M6a = 0;  //mute for part 6a off
+byte M6b = 0;  //mute for part 6b off
+byte M7a = 0;  //mute for part 7a off
+byte M7b = 0;  //mute for part 7b off
+byte S = 0;   //stop/start bit
+
+
+/*void HandleClock() {
+ 
+ //do stuff ?
+ 
+ }
+ */
+
+
+void HandleNoteOn (byte channel, byte note, byte velocity){
+  //if note X is sent, send program change control to go up
+  //todo: 
+
+  if (velocity>0){ //needs to be greater than zero, not equal to,
+    switch (note) {
+    case 58: //note value of A#3 or 0x3a
+      if (S == 0){
+        S++;
+        MIDI.sendRealTime(Start);
+      }
+      else
+      {
+        S--;
+        MIDI.sendRealTime(Stop);
+        //        MIDI.sendSongPosition(0);
+      }
+      break;
+    case 60: //note value of C4  or 0x3C, handles program change 'up'
+      if (P == 127){    //this notes that the program is at the highest of 127 and needs reset to 0
+        P=0;
+        MIDI.sendControlChange(99,05,10);
+        MIDI.sendControlChange(98,107,10);
+        MIDI.sendControlChange(06,0,10);
+        MIDI.sendControlChange(99,05,10);
+        MIDI.sendControlChange(98,108,10);
+        MIDI.sendControlChange(06,0,10);
+        MIDI.sendProgramChange(P,10);
+      }
+      else
+      {
+        P++;
+        MIDI.sendControlChange(99,05,10);
+        MIDI.sendControlChange(98,107,10);
+        MIDI.sendControlChange(06,0,10);
+        MIDI.sendControlChange(99,05,10);
+        MIDI.sendControlChange(98,108,10);
+        MIDI.sendControlChange(06,0,10);
+        MIDI.sendProgramChange(P,10);
+
+      }
+      break;
+    case 62: // note value of D4  or 0x3E, handles program change 'down'.
+      if (P== 0){
+        P=127;
+        MIDI.sendControlChange(99,05,10);
+        MIDI.sendControlChange(98,107,10);
+        MIDI.sendControlChange(06,0,10);
+        MIDI.sendControlChange(99,05,10);
+        MIDI.sendControlChange(98,108,10);
+        MIDI.sendControlChange(06,0,10);
+        MIDI.sendProgramChange(P,10); 
+      }
+      else 
+      {
+        P--;
+        MIDI.sendControlChange(99,05,10);
+        MIDI.sendControlChange(98,107,10);
+        MIDI.sendControlChange(06,0,10);
+        MIDI.sendControlChange(99,05,10);
+        MIDI.sendControlChange(98,108,10);
+        MIDI.sendControlChange(06,0,10);
+        MIDI.sendProgramChange(P,10);
+
+      }
+      break;
+    case 64:		//part 1 mute, M variable tells us if it's muted already;  all these mutes actually set the volume to zero, uses the volume NRPNs!
+      if (M1==0) {
+        MIDI.sendControlChange(99,5,10);
+        MIDI.sendControlChange(98,1,10);
+        MIDI.sendControlChange(06,0,10);  //sets level to zero, for part 1
+        //need to toggle it
+        M1=1;
+      }
+      else {
+        MIDI.sendControlChange(99,5,10);
+        MIDI.sendControlChange(98,1,10);
+        MIDI.sendControlChange(06,120,10);
+        M1=0;
+      }
+
+      break;
+    case 66:
+      if (M2==0) {
+        MIDI.sendControlChange(99,5,10);
+        MIDI.sendControlChange(98,9,10);
+        MIDI.sendControlChange(06,0,10);  //sets level to zero, for part 2
+        //need to toggle it
+        M2=1;
+      }
+      else {
+        MIDI.sendControlChange(99,5,10);
+        MIDI.sendControlChange(98,9,10);
+        MIDI.sendControlChange(06,120,10);
+        M2=0;
+      }
+      break;
+    case 68:   //mute for part 3
+      if (M3==0) {
+        MIDI.sendControlChange(99,5,10);
+        MIDI.sendControlChange(98,17,10);
+        MIDI.sendControlChange(06,0,10);  //sets level to zero, for part 3
+        //need to toggle it
+        M3=1;
+      }
+      else {
+        MIDI.sendControlChange(99,5,10);
+        MIDI.sendControlChange(98,17,10);
+        MIDI.sendControlChange(06,120,10);
+        M3=0;
+      }
+      break;
+    case 70:
+      if (M4==0) {
+        MIDI.sendControlChange(99,5,10);
+        MIDI.sendControlChange(98,25,10);
+        MIDI.sendControlChange(06,0,10);  //sets level to zero, for part 1
+        //need to toggle it
+        M4=1;
+      }
+      else {
+        MIDI.sendControlChange(99,5,10);
+        MIDI.sendControlChange(98,25,10);
+        MIDI.sendControlChange(06,120,10);
+        M4=0;
+      }
+      break;
+    case 72:
+      if (M5==0) {
+        MIDI.sendControlChange(99,5,10);
+        MIDI.sendControlChange(98,33,10);
+        MIDI.sendControlChange(06,0,10);  //sets level to zero, for part 1
+        //need to toggle it
+        M5=1;
+      }
+      else {
+        MIDI.sendControlChange(99,5,10);
+        MIDI.sendControlChange(98,33,10);
+        MIDI.sendControlChange(06,120,10);
+        M5=0;
+      }
+      break;
+    case 74:
+      if (M6a==0) {
+        MIDI.sendControlChange(99,5,10);
+        MIDI.sendControlChange(98,41,10);
+        MIDI.sendControlChange(06,0,10);  //sets level to zero, for part 1
+        //need to toggle it
+        M6a=1;
+      }
+      else {
+        MIDI.sendControlChange(99,5,10);
+        MIDI.sendControlChange(98,41,10);
+        MIDI.sendControlChange(06,120,10);
+        M6a=0;
+      }
+      break;
+    case 76:
+      if (M6b==0) {
+        MIDI.sendControlChange(99,5,10);
+        MIDI.sendControlChange(98,49,10);
+        MIDI.sendControlChange(06,0,10);  //sets level to zero, for part 1
+        //need to toggle it
+        M6b=1;
+      }
+      else {
+        MIDI.sendControlChange(99,5,10);
+        MIDI.sendControlChange(98,49,10);
+        MIDI.sendControlChange(06,120,10);
+        M6b=0;
+      }
+      break;
+    case 78:
+      if (M7a==0) {
+        MIDI.sendControlChange(99,5,10);
+        MIDI.sendControlChange(98,57,10);
+        MIDI.sendControlChange(06,0,10);  //sets level to zero, for part 1
+        //need to toggle it
+        M7a=1;
+      }
+      else {
+        MIDI.sendControlChange(99,5,10);
+        MIDI.sendControlChange(98,57,10);
+        MIDI.sendControlChange(06,120,10);
+        M7a=0;
+      }
+      break;
+    case 80:
+      if (M7b==0) {
+        MIDI.sendControlChange(99,5,10);
+        MIDI.sendControlChange(98,65,10);
+        MIDI.sendControlChange(06,0,10);  //sets level to zero, for part 1
+        //need to toggle it
+        M7b=1;
+      }
+      else {
+        MIDI.sendControlChange(99,5,10);
+        MIDI.sendControlChange(98,65,10);
+        MIDI.sendControlChange(06,120,10);
+        M7b=0;
+      }
+      break;
+
+
+    } //end of switch (note)  
+
+
+
+  }
+
+  else{
+    switch(note){
+    case 58:
+      MIDI.sendNoteOff(58,0,10);
+      break;
+    case 60:
+      MIDI.sendNoteOff(60,0,10);
+      break;
+    case 62:
+      MIDI.sendNoteOff(62,0, 10);
+      break;   
+    case 64:
+      MIDI.sendNoteOff(64,0, 10);
+      break;      
+    case 66:
+      MIDI.sendNoteOff(66,0, 10);
+      break;      
+    case 68:
+      MIDI.sendNoteOff(68,0, 10);
+      break;      
+    case 70:
+      MIDI.sendNoteOff(70,0, 10);
+      break;      
+    case 72:
+      MIDI.sendNoteOff(72,0, 10);
+      break;      
+    case 74:
+      MIDI.sendNoteOff(74,0, 10);
+      break;   
+    case 76:
+      MIDI.sendNoteOff(76,0, 10);
+      break;      
+    case 78:
+      MIDI.sendNoteOff(78,0, 10);
+      break;     
+    case 80:
+      MIDI.sendNoteOff(80,0, 10);
+      break;            
+
+    }
+  }
+
+}
+
+
+void setup() {
+  pinMode(led, OUTPUT);  
+  MIDI.begin(MIDI_CHANNEL_OMNI);
+  MIDI.turnThruOff();
+  MIDI.setHandleNoteOn(HandleNoteOn);
+  MIDI.sendProgramChange(P,10);
+  //   MIDI.setHandleClock ( HandleClock );
+
+
+  //MIDIfile & SD card setups
+  // Initialise SD
+  if (!SD.begin(SD_SELECT, SPI_FULL_SPEED))
+  {
+    DEBUG("\nSD init fail!");
+
+  }
+
+  // Initialise MIDIFile
+  SMF.begin(&SD);
+  SMF.setMidiHandler(midiCallback);
+  SMF.setSysexHandler(sysexCallback);
+
+  SMF.setFilename("1.MID");
+  SMF.load();
+  SMF.setTempo(bpm);
+
+  digitalWrite(led, HIGH);   // turn the LED on (HIGH is the voltage level)
+  delay(1000);               // wait for a second
+  digitalWrite(led, LOW);    // turn the LED off by making the voltage LOW
+  delay(1000);               // wait for a second
+
+}
+
+void Sync(){
+
+  unsigned long currentMillis = millis();
+  if(currentMillis - prevmillis > interval) {
+    // save the last time.
+    prevmillis = currentMillis;
+    MIDI.sendRealTime(Clock);    
+}
+
+}
+
+
+void loop () {
+
+  MIDI.read(); 
+  Sync();
+  
+  //is there incoming MIDI?
+  	// play the file
+		
+/*while (!SMF.isEOF())
+		{
+			SMF.getNextEvent();
+			Sync();
+
+		}*/
+
+}
+
+
+
+
+

@@ -1,12 +1,10 @@
-
-#include <SdFat.h>
-
-
+//#include <SoftwareSerial.h>
 
 #include <MIDIFile.h>
-//#include <MIDIHelper.h>
-//#include <SoftwareSerial.h>
 #include <MIDI.h>
+#include <SdFat.h>
+
+int MIDI_ENABLE = 19; 
 /*
 8/9/13: 
  
@@ -27,46 +25,55 @@
  i.  note 79 is part 7a
  j.  note 80 is part 7b
  
+ 2.  Can send a hard coded MIDI master clock signal.  
+ 
+ 
+ 
  
  TO DO:
  ----------------------------
- MIDI  CLock Master
- 
- define tempo  (need to decide how I'll set tempo.  could be an LED & dial, but also could be defined by the MIDI file that is played from the SD card).  
- for testing, I'll use 127bpm
- clock needs to be sent 24 times per quarter note
- need a clock to start, so I know when to send a clock signal.  
+Play a MIDI file from SD card, in sync with Master clock.
  
  
  */
 //SoftwareSerial SSerial(2, 3);
-#define	DEBUG(x)	Serial.print(x)
-#define	DEBUGX(x)	Serial.print(x, HEX)
+//#define	DEBUG(x)	Serial.print(x)
+//#define	DEBUGX(x)	Serial.print(x, HEX)
 int led = 13;
 
 
 
-#define  SD_SELECT  10
-SdFat	SD;
+const int chipSelect = 10;
+
+SdFat SD;
 MIDIFile SMF;
 
 
-/*  this is the MIDIfile section that handles playing of the MIDI files on the sd card*/
+/*  this is the MIDIfile section that handles playing of the MIDI files on the SD card*/
 
 void midiCallback(midi_event *pev)
 // Called by the MIDIFile library when a file event needs to be processed
 // thru the midi communications interface.
 // This callback is set up in the setup() function.
+//  0x80 is a status btye 0x8n (n=channel).  0xe0
 {
   if ((pev->data[0] >= 0x80) && (pev->data[0] <= 0xe0))
   {
-    Serial.write(pev->data[0] | pev->channel);
-    Serial.write(&pev->data[1], pev->size-1);
+   // Serial.write(pev->data[0] | pev->channel);
+   // Serial.write(&pev->data[1], pev->size-1);
+
+    MIDI.send(MIDI.getType(), (pev->data[1]), (pev->data[2]), (pev->channel));
+
   }
   else
-    Serial.write(pev->data, pev->size);
-
+   // Serial.write(pev->data, pev->size);
+  { MIDI.send(MIDI.getType(), (pev->data[1]), (pev->data[2]), (pev->channel));}
+ 
 }
+    
+ 
+ 
+ 
 
 void sysexCallback(sysex_event *pev)
 // Called by the MIDIFile library when a system Exclusive (sysex) file event needs 
@@ -74,7 +81,14 @@ void sysexCallback(sysex_event *pev)
 // really be processed, so we just ignore it here.
 // This callback is set up in the setup() function
 {
-
+  //DEBUG("\nS T");
+  //DEBUG(pev->track);
+  //DEBUG(": Data ");
+  for (uint8_t i=0; i<pev->size; i++)
+  {
+    //DEBUGX(pev->data[i]);
+	//DEBUG(' ');
+  }
 }
 
 void midiSilence(void)
@@ -95,12 +109,6 @@ void midiSilence(void)
   for (ev.channel = 0; ev.channel < 16; ev.channel++)
     midiCallback(&ev);
 }
-
-
-
-
-
-
 
 long bpm = 120;
 long tempo = 1000/(bpm/60);
@@ -123,13 +131,7 @@ byte M7b = 0;  //mute for part 7b off
 byte S = 0;   //stop/start bit
 
 
-/*void HandleClock() {
- 
- //do stuff ?
- 
- }
- */
-
+/*
 
 void HandleNoteOn (byte channel, byte note, byte velocity){
   //if note X is sent, send program change control to go up
@@ -384,39 +386,33 @@ void HandleNoteOn (byte channel, byte note, byte velocity){
   }
 
 }
-
+*/
 
 void setup() {
-  pinMode(led, OUTPUT);  
-  MIDI.begin(MIDI_CHANNEL_OMNI);
-  MIDI.turnThruOff();
-  MIDI.setHandleNoteOn(HandleNoteOn);
-  MIDI.sendProgramChange(P,10);
+ 
+
+ MIDI.begin(MIDI_CHANNEL_OMNI);
+//  Serial.begin(57600);
+   pinMode(MIDI_ENABLE, OUTPUT);      // sets the digital pin as output 
+  digitalWrite(MIDI_ENABLE, HIGH);
+  //  MIDI.turnThruOff();
+
   //   MIDI.setHandleClock ( HandleClock );
 
 
   //MIDIfile & SD card setups
   // Initialise SD
-  if (!SD.begin(SD_SELECT, SPI_FULL_SPEED))
-  {
-    DEBUG("\nSD init fail!");
-
-  }
+  if (!SD.begin(chipSelect, SPI_HALF_SPEED))SD.initErrorHalt();
+  // Serial.println("begin success");
+ 
+  SD.begin(chipSelect, SPI_HALF_SPEED);
 
   // Initialise MIDIFile
   SMF.begin(&SD);
   SMF.setMidiHandler(midiCallback);
-  SMF.setSysexHandler(sysexCallback);
-
-  SMF.setFilename("1.MID");
-  SMF.load();
-  SMF.setTempo(bpm);
-
-  digitalWrite(led, HIGH);   // turn the LED on (HIGH is the voltage level)
-  delay(1000);               // wait for a second
-  digitalWrite(led, LOW);    // turn the LED off by making the voltage LOW
-  delay(1000);               // wait for a second
-
+//  SMF.setSysexHandler(sysexCallback);
+//MIDI.setHandleNoteOn(HandleNoteOn);
+ MIDI.sendProgramChange(P,10);   
 }
 
 void Sync(){
@@ -426,27 +422,48 @@ void Sync(){
     // save the last time.
     prevmillis = currentMillis;
     MIDI.sendRealTime(Clock);    
-}
+  }
 
 }
 
+void play(){
+   //issue here perhaps
+  SMF.setFilename("SCALE.MID");
+
+  int err = -1;
+
+  SMF.load(); //lost sync at this point.
+  err=SMF.load();  //try to print the load result
+  SMF.setTempo(bpm);
+
+  if (err != -1)
+  {
+//DEBUG("\nSMF load Error ");
+		//DEBUG(err);
+  }
+  else
+  {
+    while (!SMF.isEOF())
+    {
+      if (SMF.getNextEvent());
+    }
+    // done with this one
+    SMF.close();
+
+  }
+}
 
 void loop () {
+   MIDI.read(); 
+// Sync();
 
-  MIDI.read(); 
-  Sync();
-  
-  //is there incoming MIDI?
-  	// play the file
-		
-/*while (!SMF.isEOF())
-		{
-			SMF.getNextEvent();
-			Sync();
 
-		}*/
+
+play();
+
 
 }
+
 
 
 

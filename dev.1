@@ -62,12 +62,12 @@ void midiCallback(midi_event *pev)
    // Serial.write(pev->data[0] | pev->channel);
    // Serial.write(&pev->data[1], pev->size-1);
 
-    MIDI.send(MIDI.getType(), (pev->data[1]), (pev->data[2]), (pev->channel));
+    MIDI.send((pev->data[0]), (pev->data[1]), (pev->data[2]), (pev->channel));
 
   }
   else
    // Serial.write(pev->data, pev->size);
-  { MIDI.send(MIDI.getType(), (pev->data[1]), (pev->data[2]), (pev->channel));}
+  { MIDI.send((pev->data[0]), (pev->data[1]), (pev->data[2]), (pev->channel));}
  
 }
     

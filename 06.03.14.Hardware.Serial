@@ -105,6 +105,7 @@ int CheckJoystick()
   if (joystickState < 500) return Up;
   if (joystickState < 650) return Left;
   return Neutral;
+ // delay(100);
 } 
 
 enum COLORS { 	
@@ -437,7 +438,7 @@ void select_midi(int key){
 
   drawFilelist(listStart);
 
-  for( uint8_t b = CheckJoystick(); b != Press; b = CheckJoystick() ) {
+  for( uint8_t b = CheckJoystick(); b != Left   ; b = CheckJoystick() ) {
     if (b == Down){
       /////////////////////
       //     if (filePOS<127){

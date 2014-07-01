@@ -149,8 +149,8 @@ class MFTrack
 	bool 	PlayTracks(MIDIFile *mf, uint32_t elapsedTime);  //removes the timing of this library and just processes the track.
 //		void 		setTTick(byte tick);
 //	byte 		getTTick();
-    uint8_t 	getTickCount();              //passes in the current count of ticks that have elapsed.
-	void    setTickCount(uint32_t Tcount);
+    unsigned long 	getTickCount();              //passes in the current count of ticks that have elapsed.
+	void    setTickCount(unsigned long Tcount);
 #if DUMP_DATA
 	void	dump(void);					// DUMP the data - used for debugging
 #endif // DUMP_DATA
@@ -159,7 +159,7 @@ class MFTrack
 	void		parseEvent(MIDIFile *mf);	// process the event from the physical file
 	void		reset(void);	// Initialise class variables all in one place
 //	byte 		_Ttick;
-	uint32_t     _Tcount;		//the current tick count.
+	unsigned long     _Tcount;		//the current tick count.
 	uint8_t		_trackId;		// the id for this track
     uint32_t	_length;        // length of track in bytes
     uint32_t	_startOffset;   // start of the track in bytes from start of file

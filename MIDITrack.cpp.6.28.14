@@ -91,7 +91,7 @@ void MFTrack::setTickCount(uint32_t Tcount)
  _Tcount = Tcount;
 }
 
-uint8_t 	MFTrack::getTickCount()
+unsigned long 	MFTrack::getTickCount()
 {  
     return _Tcount;
 }
@@ -99,7 +99,8 @@ uint8_t 	MFTrack::getTickCount()
 bool MFTrack::PlayTracks(MIDIFile *mf,  uint32_t elapsedTime )
 {
 uint32_t deltaT, elapsedTicks;
-uint8_t bpm, tickCount; 
+uint8_t bpm;
+unsigned long tickCount; 
 
 tickCount = getTickCount();
 bpm = mf->getTempo();
@@ -110,13 +111,16 @@ bpm = mf->getTempo();
 	  return(false);
 
 	// move the file pointer to where we left off
-	mf->_fd.seekSet(_startOffset+_currOffset);
-	
-	
+	mf->_fd.seekSet(_startOffset+_currOffset);	
 	
 	// work out new total elapsed time
 	_elapsedTimeTotal += elapsedTime;
-	elapsedTicks = ((tickCount * (60000000/(24 * bpm))));
+	//elapsedTicks = ((tickCount * (60000000/(24 * bpm))) / (60000000/(24 * bpm)) );  //no worky.
+	elapsedTicks = _elapsedTimeTotal / (60000000L/(96 * bpm));
+	/*
+	example:  
+	
+	*/
 	
 	//_Ttick = getTTick();
 	//if (_Ttick ==0) return false;
@@ -124,6 +128,8 @@ bpm = mf->getTempo();
 	if (elapsedTicks < deltaT)
 		return(false);
 	
+	_elapsedTimeTotal -= (deltaT * (60000000L/(96 * bpm)));
+	//
 	parseEvent(mf);
 
 	// remember the offset for next time
@@ -147,6 +153,15 @@ bool MFTrack::getNextEvent(MIDIFile *mf, uint32_t elapsedTime)
 	// work out new total elapsed time
 	_elapsedTimeTotal += elapsedTime;
 	elapsedTicks = _elapsedTimeTotal / mf->getMicrosecondDelta();
+	
+	/*
+	example:  at 100 bpm, getMicrosecondDelta() = 25000 microseconds per tick.  
+	so if 1 second has elapsed, which equals 1000000 microseconds, then:
+	
+	1000000/25000 =  40 ticks.  
+	
+	
+	*/
 
 	// Get the DeltaT from the file in order to see if enough ticks have
 	// passed for the event to be active. If not, just return without

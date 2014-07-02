@@ -44,7 +44,7 @@ void MIDIFile::initialise(void)
   _syncAtStart = false;
   _paused = false;
   _tick = 0;
-  
+  _etime = 0;
   
   setMidiHandler(NULL);
   setSysexHandler(NULL);
@@ -54,7 +54,7 @@ void MIDIFile::initialise(void)
   _sd = NULL;
 
   // Set MIDI defaults
-  setTicksPerQuarterNote(24);	  // 24 ticks per quarter note
+  setTicksPerQuarterNote(96);	  // 24 ticks per quarter note
   setTempo(120);				  // 120 beats per minute
   setTimeSignature(4, 4);		  // 4/4 time
 }
@@ -91,6 +91,7 @@ void MIDIFile::close()
   _trackCount = 0;
   _syncAtStart = false;
   _paused = false;
+  _tick = 0;
 
   setFilename("");
   _fd.close();
@@ -232,11 +233,24 @@ byte MIDIFile::getTick()
 {
 return _tick;
 }
+
+void MIDIFile::setLastTime(unsigned long etime)
+{
+_etime = etime;
+}
+
+unsigned long MIDIFile::getLastTime()
+{
+return _etime;
+}
+
 bool MIDIFile::Play(void)
 {
-uint32_t	elapsedTime;
+long unsigned  elapsedTime;
 uint8_t track_count = getTrackCount();
 	uint8_t		n;	
+	
+	
 	// if we are paused we are paused!
 	if (_paused) return false;
 	
@@ -248,7 +262,8 @@ uint8_t track_count = getTrackCount();
 	}	
 	_tick = getTick();	
 	
-	elapsedTime = micros() - _lastEventCheckTime;
+	//elapsedTime = (micros() - _lastEventCheckTime);
+	elapsedTime = (getLastTime() - _lastEventCheckTime);
 	if (_tick ==0) return false;
 	_lastEventCheckTime = micros();	
 	

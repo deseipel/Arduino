@@ -151,6 +151,7 @@ class MFTrack
 //	byte 		getTTick();
     unsigned long 	getTickCount();              //passes in the current count of ticks that have elapsed.
 	void    setTickCount(unsigned long Tcount);
+ 
 #if DUMP_DATA
 	void	dump(void);					// DUMP the data - used for debugging
 #endif // DUMP_DATA
@@ -158,8 +159,7 @@ class MFTrack
   protected:
 	void		parseEvent(MIDIFile *mf);	// process the event from the physical file
 	void		reset(void);	// Initialise class variables all in one place
-//	byte 		_Ttick;
-	unsigned long     _Tcount;		//the current tick count.
+  	unsigned long     _Tcount;		//the current tick count.
 	uint8_t		_trackId;		// the id for this track
     uint32_t	_length;        // length of track in bytes
     uint32_t	_startOffset;   // start of the track in bytes from start of file
@@ -167,6 +167,7 @@ class MFTrack
 	bool		_endOfTrack;	// true when we have reached end of track or we have encountered an undefined event
 	uint32_t	_elapsedTimeTotal;	// the total time elapsed in microseconds since events were checked
 	midi_event  _mev;			// data for MIDI callback function - persists between calls for run-on messages
+		  unsigned long _etime; 
 };
 
 class MIDIFile 
@@ -190,6 +191,9 @@ class MIDIFile
 	void	  setMicrosecondPerQuarterNote(uint32_t m);
 	void 		setTick(byte tick);
 	byte 		getTick();
+				unsigned long    getLastTime(); 
+	void    setLastTime(unsigned long etime);
+
 
     // MIDI file name
     void      setFilename(const char* aname);
@@ -249,13 +253,14 @@ class MIDIFile
 	bool	  _syncAtStart;			// sync up at the start of all tracks
 	bool	  _paused;				// if true we are currently paused
 
+
 	// The fundamental time unit of music is the beat. Beats can be slower or faster depending 
 	// on the kind of music, and the tempo (speed of the beats) can change even in a single 
 	// piece. Tempos in standard music notation are typically given in beats per minute.
 	// MIDI default is 120.
  	uint16_t  _tempo;				// tempo for this file in beats per minute
 	byte 	_tick;					//holds if a tick is active.
-
+unsigned long _etime; 
 	// Notes come in different power-of-two lengths. A quarter note normally is one beat long 
 	// (although this isn't always the case). A half note is two beats, and a whole note is 
 	// four beats. (It's called a whole note because it takes up a whole measure, if you're in 4.)

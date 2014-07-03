@@ -262,8 +262,8 @@ uint8_t track_count = getTrackCount();
 	}	
 	_tick = getTick();	
 	
-	//elapsedTime = (micros() - _lastEventCheckTime);
-	elapsedTime = (getLastTime() - _lastEventCheckTime);
+	elapsedTime = (micros() - _lastEventCheckTime);
+	//elapsedTime = (getLastTime() - _lastEventCheckTime);
 	if (_tick ==0) return false;
 	_lastEventCheckTime = micros();	
 	

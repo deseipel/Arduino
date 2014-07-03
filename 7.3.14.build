@@ -277,10 +277,10 @@ enum _menuDataTypes {
 
 static MENUITEM _mi_list[] ={// type, ptrGlobal, Min,    Max,    			ptrGlobalLabels
   { 
-    "MIDI CLOCK:", 		OPTION,	_clockPtr,	0,	 (sizeof(_clockIDs)-1), _clockLabels          }
+    "MIDI CLOCK:", 		OPTION,	_clockPtr,	0,	 (sizeof(_clockIDs)-1), _clockLabels            }
   ,
   { 
-    "MIDI MAPPER:", OPTION, 	_mapperPtr, 0, (sizeof(_mapperIDs)-1), _mapperLabels         } 
+    "MIDI MAPPER:", OPTION, 	_mapperPtr, 0, (sizeof(_mapperIDs)-1), _mapperLabels           } 
 };
 
 
@@ -317,59 +317,59 @@ static MENU menu[] = {
   { 
     MAIN_MENU, "Main Menu", 4, {
       {
-        "MIDI Files", goto_menu, FILE_LIST                        }
+        "MIDI Files", goto_menu, FILE_LIST                              }
       ,  
       {
-        "Mappings", goto_menu, MAPPINGS                        }
+        "Mappings", goto_menu, MAPPINGS                              }
       ,
       {
-        "Settings", goto_menu, SETTINGS                        }
+        "Settings", goto_menu, SETTINGS                              }
       ,
       {
-        "Hide Menu", menu_hide, 0                        } 
+        "Hide Menu", menu_hide, 0                              } 
     }
   }
   ,
   { 
     FILE_LIST, "MIDI Files", 2, {
       {
-        "Select a File", select_midi, 0                        }
+        "Select a File", select_midi, 0                              }
       ,  
 
       {
-        "Go Back", goto_menu, MAIN_MENU                        } 
+        "Go Back", goto_menu, MAIN_MENU                              } 
     }
   }
   ,
   { 
     MAPPINGS, "MIDI Mappings Menu", 4, {
       {
-        "Add New Mapping", add_mapping, ADD                        }
+        "Add New Mapping", add_mapping, ADD                              }
       ,
       {
-        "Edit Mapping", edit_mapping, EDIT                        }
+        "Edit Mapping", edit_mapping, EDIT                              }
       ,
       {
-        "Delete Mapping", delete_mapping, MAIN_MENU                        }
+        "Delete Mapping", delete_mapping, MAIN_MENU                              }
       ,
       {
-        "Go Back", goto_menu, MAIN_MENU                        } 
+        "Go Back", goto_menu, MAIN_MENU                              } 
     }
   }
   ,
   { 
     SETTINGS, "Settings", 4, {
       {
-        "Map Events On/Off", mapping_onoff, static_cast<int>(MAPPER_SWITCH)                        }
+        "Map Events On/Off", mapping_onoff, static_cast<int>(MAPPER_SWITCH)                              }
       ,
       {
-        "Clock INT/EXT", clock_intext, static_cast<int>(CLOCK_SWITCH)                        }
+        "Clock INT/EXT", clock_intext, static_cast<int>(CLOCK_SWITCH)                              }
       ,
       {
-        "Tempo", set_tempo, 0                        }
+        "Tempo", set_tempo, 0                              }
       ,
       {
-        "Go Back", goto_menu, MAIN_MENU                        } 
+        "Go Back", goto_menu, MAIN_MENU                              } 
     }
   }
 };
@@ -784,19 +784,19 @@ void loop() {
 
     //		//  something happened with joystick, an update() action could be called here
   }
-  
- 
-//  if ((!SMF.isEOF()) && (S ==1))
-//  {
-//  Play();
-//   //  SMF.getNextEvent();
-//
-//  }
-//  else
-//  {
-//  SMF.close();
-//  SMF.restart();
-//  }
+
+
+  //  if ((!SMF.isEOF()) && (S ==1))
+  //  {
+  //  Play();
+  //   //  SMF.getNextEvent();
+  //
+  //  }
+  //  else
+  //  {
+  //  SMF.close();
+  //  SMF.restart();
+  //  }
 
 }
 
@@ -979,21 +979,45 @@ void midiTimer()
   if (midiClockType == 2)
   {
     if ((sync24PPQ == 0) && (S==1)  ){ 
-      
+
       //Serial.write(0xF8); // Midi Clock Sync Tick (96 PPQ)
       tick_count++; //COUNT THE TICKS SO YOU CAN CALCULATE HOW MUCH TIME HAS PASSED SO YOU CAN PLAY IN TIME IN THE MFTRACK CODE.
       MF.setTickCount(tick_count);
       if(SMF.getTick()==0)
       {
-      SMF.setTick(1); //this just lets me tell the library that a clock tick is active.
+        SMF.setTick(1); //this just lets me tell the library that a clock tick is active.
       }
-       Play();
+      
+     // if(!SMF.isEOF()){
+      Play();
+     // }
+//      else
+//      {
+//        //SMF.close();
+//      //  SMF.restart();
+//        
+//        if (Play_setup()) Play();
+//      }
       // Serial.write(0xF8); // Midi Clock Sync Tick (96 PPQ)
     }
     sync24PPQ++;
     if (sync24PPQ >= 4) {
       sync24PPQ = 0;    
       SMF.setTick(0);
+      
+      if(SMF.isEOF() )
+      { 
+       
+      SMF.close(); 
+      if (Play_setup()) Play();
+     // SMF.restart();
+      
+      }
+      
+      
+      
+      
+      
     }
   }
 }
@@ -1007,21 +1031,25 @@ void Play(){
     //if(SMF.getTick()==1){
     // digitalWrite(BEAT_LED, HIGH);
 
-   // SMF.setLastTime(micros()); 
-   // SMF.getNextEvent();
-    if (!SMF.Play()){
-        //tft stuff here is bad for midi clock
+    // SMF.setLastTime(micros()); 
+    // SMF.getNextEvent();
+   
+
+    if   (!SMF.Play() )  {
+      //tft stuff here is bad for midi clock
 
     }
-        if (started ==0)
-{
- Serial.write(0xFA);
-started=1; 
-}
+   
 
-Serial.write(0xF8); // Midi Clock Sync Tick (96 PPQ)
-   // }
-} 
+    if (started ==0)
+    {
+      Serial.write(0xFA);  //MIDI Start event
+      started=1; 
+    }
+   
+    Serial.write(0xF8); // Midi Clock Sync Tick (96 PPQ)
+    // }
+  } 
 }
 
 void FileNameCheck()
@@ -1043,7 +1071,7 @@ void FileNameCheck()
 
 bool Play_setup(){
   int  err = -1;
-  
+
   FileNameCheck();
   //  load every time?  Or only if not playing (S==0) ?
 
@@ -1078,7 +1106,7 @@ void MidiClockStart(uint8_t restart, uint8_t callMidiTimer)    //  usage is Midi
     sync24PPQ = 0;
     // midiClockCounter  = 0;
   }
- // if (midiClockType == 2) Serial.write(0xFA); // MIDI Start
+  // if (midiClockType == 2) Serial.write(0xFA); // MIDI Start
   //need a pre-load routine to load the MIDI file & setup stuff.
   if (!Play_setup());
   if (midiClockType != 1) timerStart();
@@ -1482,6 +1510,7 @@ void HandleNoteOn (byte commandByte, byte inNote, byte invelocity){
   }
 
 }
+
 
 
 

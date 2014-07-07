@@ -36,7 +36,9 @@ void MFTrack::reset(void)
 	_elapsedTimeTotal = 0;
 	_trackId = 255;
 //	_Ttick = 0;
-    _Tcount = 0;
+   // _Tcount = 0;
+	//_delta = 0; 
+	//setDelta(0);
 }
 
 MFTrack::MFTrack(void)
@@ -86,7 +88,7 @@ byte MFTrack::getTTick()
 return _Ttick;
 } */
 
-void MFTrack::setTickCount(uint32_t Tcount)
+/* void MFTrack::setTickCount(unsigned long Tcount)
 {
  _Tcount = Tcount;
 }
@@ -94,44 +96,67 @@ void MFTrack::setTickCount(uint32_t Tcount)
 unsigned long 	MFTrack::getTickCount()
 {  
     return _Tcount;
+} */
+
+/* void MFTrack::setDelta(uint32_t delta)
+{
+_delta = delta;
 }
+
+uint32_t MFTrack::getDelta()
+{
+return _delta;
+} */
 
 bool MFTrack::PlayTracks(MIDIFile *mf,  uint32_t elapsedTime )
 {
-uint32_t deltaT, elapsedTicks;
+uint32_t deltaT, elapsedTicks, total_deltas;
 uint8_t bpm;
-unsigned long tickCount; 
+uint32_t tickCount; 
 
-tickCount = getTickCount();
+tickCount = mf->getTickCount();   //this is where I set the tickCount, which is a running total of how many ticks have passed.
 bpm = mf->getTempo();
-
 
 // is there anything to process?
 	if (_endOfTrack)
-	  return(false);
-
+	  return(false);	 
+	 
 	// move the file pointer to where we left off
 	mf->_fd.seekSet(_startOffset+_currOffset);	
 	
 	// work out new total elapsed time
 	_elapsedTimeTotal += elapsedTime;
 	//elapsedTicks = ((tickCount * (60000000/(24 * bpm))) / (60000000/(24 * bpm)) );  //no worky.
-	elapsedTicks = _elapsedTimeTotal / (60000000L/(96 * bpm));
-	/*
-	example:  
+	elapsedTicks = _elapsedTimeTotal / (60000000L/(96 * bpm));  //original part of the library code.  This ultimately uses elapsed time and divides it by 
+	//                                                            the length of one tick.//
+
+	deltaT = readVarLen(&mf->_fd);   //this calls the readVarLen in the MIDIHelper.cpp file.
 	
-	*/
+	//mf->setDelta(deltaT);
 	
-	//_Ttick = getTTick();
-	//if (_Ttick ==0) return false;
-	deltaT = readVarLen(&mf->_fd);
-	if (elapsedTicks < deltaT)
-		return(false);
+	 	total_deltas = ( mf->getDelta() +  deltaT  )  ; // add the old delta time to the new one.
+	//need to code a way to keep a running total of the deltas	
+	
+	//  if (elapsedTicks < deltaT)  //part of the original code, comparing elapsed ticks and the read delta.
+	//	return(false);  
+		
+		
+		if (tickCount < total_deltas)  //
+		{
+		return (false);
+		total_deltas=(mf->getDelta());
+		}
+		
 	
 	_elapsedTimeTotal -= (deltaT * (60000000L/(96 * bpm)));
-	//
+	mf->setTickCount( total_deltas);
+	
+	
+	mf->setDelta(total_deltas);
 	parseEvent(mf);
 
+	//mf->setTickCount(0);
+	
 	// remember the offset for next time
 	_currOffset = mf->_fd.curPosition() - _startOffset;
 	return (true);

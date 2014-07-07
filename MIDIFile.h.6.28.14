@@ -149,8 +149,10 @@ class MFTrack
 	bool 	PlayTracks(MIDIFile *mf, uint32_t elapsedTime);  //removes the timing of this library and just processes the track.
 //		void 		setTTick(byte tick);
 //	byte 		getTTick();
-    unsigned long 	getTickCount();              //passes in the current count of ticks that have elapsed.
-	void    setTickCount(unsigned long Tcount);
+/*     unsigned long 	getTickCount();              //passes in the current count of ticks that have elapsed.
+	void    setTickCount(unsigned long Tcount); */
+/* 	void    setDelta(uint32_t delta);
+	uint32_t getDelta(void); */
  
 #if DUMP_DATA
 	void	dump(void);					// DUMP the data - used for debugging
@@ -159,7 +161,8 @@ class MFTrack
   protected:
 	void		parseEvent(MIDIFile *mf);	// process the event from the physical file
 	void		reset(void);	// Initialise class variables all in one place
-  	unsigned long     _Tcount;		//the current tick count.
+ // 	unsigned long     _Tcount;		//the current tick count.
+//	unsigned long     _delta; 
 	uint8_t		_trackId;		// the id for this track
     uint32_t	_length;        // length of track in bytes
     uint32_t	_startOffset;   // start of the track in bytes from start of file
@@ -191,8 +194,13 @@ class MIDIFile
 	void	  setMicrosecondPerQuarterNote(uint32_t m);
 	void 		setTick(byte tick);
 	byte 		getTick();
-				unsigned long    getLastTime(); 
+	unsigned long    getLastTime(); 
 	void    setLastTime(unsigned long etime);
+	void    setDelta(uint32_t delta);
+	uint32_t getDelta(void);
+	unsigned long 	getTickCount();              //passes in the current count of ticks that have elapsed.
+	void    setTickCount(unsigned long Tcount);
+
 
 
     // MIDI file name
@@ -252,7 +260,7 @@ class MIDIFile
 	uint32_t  _lastEventCheckTime;	// the last time an event check was performed
 	bool	  _syncAtStart;			// sync up at the start of all tracks
 	bool	  _paused;				// if true we are currently paused
-
+	unsigned long _Tcount;
 
 	// The fundamental time unit of music is the beat. Beats can be slower or faster depending 
 	// on the kind of music, and the tempo (speed of the beats) can change even in a single 
@@ -261,6 +269,7 @@ class MIDIFile
  	uint16_t  _tempo;				// tempo for this file in beats per minute
 	byte 	_tick;					//holds if a tick is active.
 unsigned long _etime; 
+unsigned long _delta; 
 	// Notes come in different power-of-two lengths. A quarter note normally is one beat long 
 	// (although this isn't always the case). A half note is two beats, and a whole note is 
 	// four beats. (It's called a whole note because it takes up a whole measure, if you're in 4.)

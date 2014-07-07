@@ -44,8 +44,9 @@ void MIDIFile::initialise(void)
   _syncAtStart = false;
   _paused = false;
   _tick = 0;
+  _Tcount = 0;
   _etime = 0;
-  
+  _delta = 0; 
   setMidiHandler(NULL);
   setSysexHandler(NULL);
 
@@ -92,7 +93,7 @@ void MIDIFile::close()
   _syncAtStart = false;
   _paused = false;
   _tick = 0;
-
+ _etime = 0;
   setFilename("");
   _fd.close();
 }
@@ -229,9 +230,29 @@ void MIDIFile::setTick(byte tick)
    _tick = tick; 
 }
 
+void MIDIFile::setDelta(uint32_t delta)
+{
+_delta = delta;
+}
+
+uint32_t MIDIFile::getDelta()
+{
+return _delta;
+}
+
 byte MIDIFile::getTick()
 {
 return _tick;
+}
+
+void MIDIFile::setTickCount(unsigned long Tcount)
+{
+ _Tcount = Tcount;
+}
+
+unsigned long 	MIDIFile::getTickCount()
+{  
+    return _Tcount;
 }
 
 void MIDIFile::setLastTime(unsigned long etime)
@@ -262,13 +283,13 @@ uint8_t track_count = getTrackCount();
 	}	
 	_tick = getTick();	
 	
-	elapsedTime = (micros() - _lastEventCheckTime);
-	//elapsedTime = (getLastTime() - _lastEventCheckTime);
-	if (_tick ==0) return false;
-	_lastEventCheckTime = micros();	
+	//elapsedTime = (micros() - _lastEventCheckTime);
+	elapsedTime = (getLastTime() - _lastEventCheckTime);
+	if (_tick ==0) return false;  //tick is set in the midi timer, during the time when MIDI clock sync is set.  
+	//_lastEventCheckTime = micros();	
+	_lastEventCheckTime= getLastTime();
 	
-	
-	if (_format != 0) DUMPS("\n-- TRK "); 
+	//if (_format != 0) DUMPS("\n-- TRK "); 
 	// process all events from each track first - TRACK PRIORITY
 	for (uint8_t i = 0; i < track_count; i++)
 	{
@@ -284,6 +305,7 @@ uint8_t track_count = getTrackCount();
 				break;
 		}
 }
+
 }
 boolean MIDIFile::getNextEvent(void)
 {
@@ -356,7 +378,7 @@ boolean MIDIFile::getNextEvent(void)
 }
 
 int MIDIFile::load() 
-// Load the MIDI file into memory ready for processing
+// load the MIDI file into memory ready for processing
 {
   uint32_t  dat32;
   uint16_t  dat16;

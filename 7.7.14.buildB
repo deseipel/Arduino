@@ -508,7 +508,8 @@ void select_midi(int key){
       /////////////////////
 
 
-      filePOS = (filePOS++)%maxmidicount;  //wraps back to 0 if  = maximidicount
+     // filePOS = (filePOS++)%maxmidicount;  //wraps back to 0 if  = maximidicount
+     filePOS = (filePOS+maxmidicount+1)%maxmidicount;
       listStart = filePOS;    
       drawFilelist(listStart);
       // sprintf(msg, "listStart: %d\n filePOS: %d\n fileIndex: %d\n", listStart,  filePOS, fileIndex);

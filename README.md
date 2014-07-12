@@ -10,30 +10,30 @@ stop/start and specific NRPNs.
 
 Required Hardware:
 ------------------------------------------------------------------------------------------
-MIDI Device to control
-MIDI events you wish to map
-Arduino MEGA
-MIDI shield (I used Ruggeduino MIDI shield, which as of this writing has been discontinued )
-Ada Fruit TFT/SD shield
-Micro SD card
-USB cable 
-Power supply (if not using the USB cable)
-Jumper Cables for the Arduino (not car jumper cables).
-Solder Gun
-Solder
+-MIDI Device to control
+-MIDI events you wish to map
+-Arduino MEGA
+-MIDI shield (I used Ruggeduino MIDI shield, which as of this writing has been discontinued )
+-Ada Fruit TFT/SD shield
+-Micro SD card
+-USB cable 
+-Power supply (if not using the USB cable)
+-Jumper Cables for the Arduino (not car jumper cables).
+-Solder Gun
+-Solder
 
 
 Required Software:
 --------------------------------------------------------------------------------------------
-Arduino IDE 1.05
-MIDIFile Library
+-Arduino IDE 1.05
+-MIDIFile Library
 
 
 Reccommended Software (for debugging)
 ---------------------------------------------------------------------------------------------
-MIDIOX
-Hex Editor
-MF2T
+-MIDIOX
+-Hex Editor
+-MF2T
 
 
 

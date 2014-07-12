@@ -1,8 +1,9 @@
 Arduino MIDI Master Clock/SD MIDI File Player-Looper/MIDI Mapper
 -----------------------------------------------------------------------------------------
-
-
-
+This project allows one to play and loop midi files/songs to a hardware synth or Midi 
+device, while sending MIDI clock sync.  In addition, it allows for the mapping of midi events to 
+other midi events.  In the current configuration, it maps certain notes to program changes, 
+stop/start and specific NRPNs.  
 
 
 
@@ -12,7 +13,7 @@ Required Hardware:
 MIDI Device to control
 MIDI events you wish to map
 Arduino MEGA
-MIDI shield (I used Ruggeduino MIDI shield )
+MIDI shield (I used Ruggeduino MIDI shield, which as of this writing has been discontinued )
 Ada Fruit TFT/SD shield
 Micro SD card
 USB cable 
@@ -28,7 +29,7 @@ Arduino IDE 1.05
 MIDIFile Library
 
 
-Reccommended Software
+Reccommended Software (for debugging)
 ---------------------------------------------------------------------------------------------
 MIDIOX
 Hex Editor

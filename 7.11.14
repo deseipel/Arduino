@@ -1,8 +1,12 @@
+
+
+
+
 /*
 
  To Do:
  
-1.  
+1.  the midi file list menu isn't syncing with the ES1
 2.  the main screen should update more to show the queued song
 
  
@@ -368,12 +372,13 @@ void set_tempo(int key){
     tft.drawRect(80, 1, 40, 16, BLACK);
     tft.fillRect(80, 1 , 40, 16, BLACK);
     String TempoString = "Tempo: "; 
-
+  
     String String3;  // a string so I can concat tempo char and tempo bpm
     String3 = TempoString + bpm; 
     tft.setCursor(1, 3);
     //sprintf( textx, String3 );
-    tft.print(String3);
+    tft.println(String3);
+
 
     if( b == Up  )
       bpm++;
@@ -624,9 +629,19 @@ void menu_parent( ){
 //  displays the currently selected menu (or uarr for menu if not enabled)
 void draw_menu( ){
   String TempoString = "Tempo: "; 
-
+  //String BarString = "Bar: ";
   String String3;  // a string so I can concat tempo char and tempo bpm
   String3 = TempoString + bpm; 
+ // String String4;  
+ // String4 = BarString + (getBar());
+  
+  //    tft.drawRect(80, 1, 40, 16, BLACK);
+   // tft.fillRect(80, 1 , 40, 16, BLACK);
+  
+  
+//tft.println(String3);
+//tft.println(String4);  
+  
   if( ! menu_enable ) {
     cls();
 
@@ -896,6 +911,17 @@ void FileNameCheck()   //this handles setting up a file to play and also lets me
     //  // err = SMF.load();    //test to see if this works
     oldP = P;
     filePOS= P;
+   // draw_menu();  this messes up the timing.
+       //tft.setCursor(30, 12);  //not needed
+//    tft.setTextColor(WHITE);
+
+  tft.drawRect(30, 20, 128, 8, BLACK);
+  tft.fillRect(30, 20 , 128, 8, BLACK); 
+  tft.setCursor(30, 20);
+  tft.print(" ");
+  tft.print(nameFiles[filePOS]);
+//    tft.print("File: ");
+//    tft.println(nameFiles[filePOS]);
     // 
   }
 }
@@ -955,20 +981,30 @@ void MidiClockStop()
   tick_count = 0; 
   started = 0; 
 
-uint32_t tcount,delta;
-tcount = SMF.getTickCount();
-delta = SMF.getDelta();
- float bars = ceil(tcount/384.00);   //little trick here, ceil rounds up a floating point number, had to add decimal to 384 for this to work.
-
-   tft.setCursor(5, 120);
-    tft.println(tcount );
-    tft.println(delta);
-    tft.println (bars);
+//uint32_t tcount,delta;
+//tcount = SMF.getTickCount();
+//delta = SMF.getDelta();
+// float bars = ceil(tcount/384.00);   //little trick here, ceil rounds up a floating point number, had to add decimal to 384 for this to work.
+//
+//   tft.setCursor(5, 120);
+//    tft.println(tcount );
+//    tft.println(delta);
+//    tft.println (bars);
     
     SMF.setDelta(0);
 
 
 
+}
+
+int getBars()
+{
+  uint32_t tcount;
+tcount = SMF.getTickCount();
+//delta = SMF.getDelta();
+ float bars = ceil(tcount/384.00);   //little trick here, ceil rounds up a floating point number, had to add decimal to 384 for this to work.
+
+return (bars);
 }
 
 // ======================================================================================= //
@@ -1065,12 +1101,14 @@ void HandleNoteOn (byte commandByte, byte inNote, byte invelocity){
     case 12: //note value of A#3 or 0x3a    
       if (S == 0){
         S++;
+        draw_menu();
         MidiClockStart(true,true);
         startsignal = 1; 
       }
       else
       {
         S--;
+        draw_menu();
         // MIDI.sendRealTime(Stop);
         // Serial.write(Stop); 
         MidiClockStop();
@@ -1092,14 +1130,11 @@ void HandleNoteOn (byte commandByte, byte inNote, byte invelocity){
         sendChangeControl(06,0,10);
         sendProgramChange(P,10);
 
-        //  draw_menu();
+          draw_menu();
         tft.setCursor(5, 120);
         tft.setTextColor(RED);
         tft.println(nameFiles[P]);
         tft.println(P);
-
-
-
       }
       else
       {
@@ -1113,7 +1148,7 @@ void HandleNoteOn (byte commandByte, byte inNote, byte invelocity){
         sendProgramChange(P,10);
         //filePOS=P;
 
-        // draw_menu();
+         draw_menu();
         tft.setCursor(5, 120);
         tft.setTextColor(RED);
         tft.println(nameFiles[P]);

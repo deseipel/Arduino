@@ -6,8 +6,7 @@
 
  To Do:
  
-1.  the midi file list menu isn't syncing with the ES1
-2.  the main screen should update more to show the queued song
+
 
  
  */
@@ -725,12 +724,13 @@ void setup(){
   tft.println("SD Init completed");
 
 
-  draw_menu();
+ // draw_menu();
   IndexFileNames();   //get a count of the MID files
   SMF.begin(&SD);
   SMF.setMidiHandler(midiCallback);
  // pinMode(13, OUTPUT);
   //digitalWrite(BEAT_LED, LOW);
+  draw_menu();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1130,8 +1130,8 @@ void HandleNoteOn (byte commandByte, byte inNote, byte invelocity){
       }
       break;
     case 13: //note value of C4  or 0x3C, handles program change 'up'
-      if (P == 127){    //this notes that the program is at the highest of 127 and needs reset to 0
-        P=0;
+      if (P == maxmidicount-1){    //this notes that the program is at the highest of 127 and needs reset to 0
+        P=1;
         sendChangeControl(99,05,10);  //double check these control change msgs
         sendChangeControl(98,107,10);
         sendChangeControl(06,0,10);
@@ -1139,7 +1139,7 @@ void HandleNoteOn (byte commandByte, byte inNote, byte invelocity){
         sendChangeControl(98,108,10);
         sendChangeControl(06,0,10);
         sendProgramChange(P,10);
-
+        filePOS=P;
           draw_menu();
         tft.setCursor(5, 120);
         tft.setTextColor(RED);
@@ -1156,7 +1156,7 @@ void HandleNoteOn (byte commandByte, byte inNote, byte invelocity){
         sendChangeControl(98,108,10);
         sendChangeControl(06,0,10);
         sendProgramChange(P,10);
-        //filePOS=P;
+        filePOS=P;
 
          draw_menu();
         tft.setCursor(5, 120);
@@ -1166,8 +1166,8 @@ void HandleNoteOn (byte commandByte, byte inNote, byte invelocity){
       }
       break;
     case 14: // note value of D4  or 0x3E, handles program change 'down'.
-      if (P== 0){
-        P=127;
+      if (P== 1){
+        P=maxmidicount-1;
         sendChangeControl(99,05,10);
         sendChangeControl(98,107,10);
         sendChangeControl(06,0,10);
@@ -1175,7 +1175,7 @@ void HandleNoteOn (byte commandByte, byte inNote, byte invelocity){
         sendChangeControl(98,108,10);
         sendChangeControl(06,0,10);
         sendProgramChange(P,10); 
-        //      filePOS=P;
+              filePOS=P;
 
         draw_menu();
         tft.setCursor(5, 120);
@@ -1194,7 +1194,7 @@ void HandleNoteOn (byte commandByte, byte inNote, byte invelocity){
         sendChangeControl(98,108,10);
         sendChangeControl(06,0,10);
         sendProgramChange(P,10);
-        //    filePOS=P;
+            filePOS=P;
 
         draw_menu();
         tft.setCursor(5, 120);

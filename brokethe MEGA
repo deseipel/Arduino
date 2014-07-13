@@ -653,8 +653,8 @@ void draw_menu( ){
     tft.setTextColor(GREEN);
     tft.print("File: ");
     tft.println(nameFiles[filePOS]);
-     tft.setTextColor(YELLOW);
-     tft.print("Next: ");
+   //  tft.setTextColor(YELLOW);   //ONE OF THESE BREAKS THE SKETCH FROM UPLOADING, POSSIBLY THE COLONS?
+   //  tft.print("Next: ");
      
      
     tft.setCursor(1,50);

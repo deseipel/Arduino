@@ -329,6 +329,7 @@ uint8_t track_count = getTrackCount();
 			bb = _track[i].PlayTracks(this, (n==0 ? elapsedTime : 0));
 			if ((bb) && (_format != 0)) DUMPS("\n-- TRK "); 
 			//doneEvents1 ||= bb;   //won't compile.
+			doneEvents1= (doneEvents1 || bb);
 		}
 
 		// When there are no more events, just break out
@@ -403,6 +404,7 @@ boolean MIDIFile::getNextEvent(void)
 			if (b && (_format != 0))
 				DUMPS("\n-- TRK "); 
 			//doneEvents ||= b;
+			doneEvents = (doneEvents || b);
 		}
 
 		// When there are no more events, just break out

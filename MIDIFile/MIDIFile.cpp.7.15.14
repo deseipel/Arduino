@@ -287,8 +287,11 @@ uint8_t track_count = getTrackCount();
 	
 	//elapsedTime = (micros() - _lastEventCheckTime);
 	elapsedTime = (getLastTime() - _lastEventCheckTime);
+	//  IF THE TIMER'S FREQUENCY IS SET TO 96PPQ THEN EACH TIME PLAY IS CALLED, IT SHOULD NEVER BE TOO SOON, AND THEREFORE NO REASON TO CHECK IT? 
+	// TURNING THE TICK CHECK OFF.  -- NO, this check appears to improve the loop timing somehow. (tick is on the downbeat probably).
+	
 	if (_tick ==0) return false;  //tick is set in the midi timer, during the time when MIDI clock sync is set.  
-	//_lastEventCheckTime = micros();	
+	_lastEventCheckTime = micros();	
 	_lastEventCheckTime= getLastTime();
 	
 	//if (_format != 0) DUMPS("\n-- TRK "); 

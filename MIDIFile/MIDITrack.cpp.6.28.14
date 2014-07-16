@@ -143,8 +143,9 @@ bpm = mf->getTempo();
 		
 		if (tickCount < total_deltas)  //
 		{
-		return (false);
 		total_deltas=(mf->getDelta());
+		return (false);
+		//total_deltas=(mf->getDelta());
 		}
 		
 	

@@ -5,13 +5,6 @@
 /*
 
  To Do:
- 1.  drawing the list of files is sometimes not right during playback;
- 2.  working the joystick during playback can sometimes crash playback.  not sure why.  Not often.
-     - play a file
-     - queue up the next file
-     - go into the file list ( the currently played file isn't shown).
-     
- 3.  If you're 'inside' the menu system when a file loops, it still writes it to the screen (blue letters).
  
  
  */
@@ -188,8 +181,8 @@ void drawFilelist(int listStart){     ///this function lists the MIDI file names
  
   */
 
-if(filePOS<listStart)listStart=1; 
-    
+//if(filePOS<listStart)listStart=(filePOS); //   just set liststart = filePOS 
+   
   for(fileIndex = listStart; fileIndex < (listStart+10); fileIndex++){   ///works well
     if (fileIndex == filePOS) {
       tft.setTextColor(ST7735_GREEN);
@@ -524,8 +517,8 @@ setNextSong();
       sendChangeControl(98,108,10);
       sendChangeControl(06,0,10);
 
-      P=filePOS;
-      sendProgramChange(filePOS,10);
+      P=filePOS-1;
+      sendProgramChange(P,10);
       //  P=filePOS;
     }
     //////////////////////////
@@ -547,8 +540,8 @@ setNextSong();
       sendChangeControl(99,05,10);
       sendChangeControl(98,108,10);
       sendChangeControl(06,0,10);
-      P=filePOS;
-      sendProgramChange(filePOS,10);
+      P=filePOS-1;
+      sendProgramChange(P,10);
       //  P=filePOS;
     }
     //
@@ -890,8 +883,49 @@ void midiTimer()
       //Serial.write(0xF8); // Midi Clock Sync Tick (96 PPQ)
       SMF.setTick(1); //this just lets me tell the library that a clock tick is active.
 
-      Play();
+      //Play();
+  if(!SMF.isEOF() )
+      { 
+        Play();
+      }
+      else
+      {
 
+ // if(SMF.isEOF()){
+    
+        SMF.close(); 
+
+        if (Play_setup())  //this is the code that handles the looping of the midi files
+          // in order to loop files IN TIME, I had to account for the fact that the last MIDI event in an ordinary MIDI file only contains a delta time for the last event.  
+          //  You can't just restart a MIDI file over again when it's done playing.  It doesn't 'Play' till the end of the last bar, it stops at the last event, which might be 
+          //    the first note.  I'm essentially off-setting the tick count (used to play en event in the MIDIFile library) on the first event here to account for the lack of deltas at the 
+          //    end of the MIDI file.  Another option might be to put a note at the end of the MIDI file with zero velocity.  It would be an end of file marker basically, and contain a delta to bridge 
+          //    the gap.  
+
+          /*
+the Loop assumes a few things:  4/4 time & looping to occur at the bar level (4 quarter notes * 96 PPQ = 384 pulses per bar)
+           we determine a 'rough estimate' of the number of bars by taking the current tick count/384 and then using ceil to round up.  Then cast that number to an integer.  
+           We now know how many bars were just played.  Now we can figure out how much to offset the tick to loop in time.  We do this by subtracting the number of ticks that should've occured
+           from the number of actual ticks that occured.  this offsets the tick count so that the first event won't begin playing until enough ticks have passed.  
+           
+           */
+
+        {          
+          //need to count the ticks at the last delta and then somehow get it to finish out the bar to the real end?  offset the next start?  4592/
+          // ceil rounds up to next whole number.
+          float fbars = ceil(tick_count/384.00);   //this returns the rounded up number of bars.  384 is the number of ticks in one bar of 4/4 (assumes 96 PPQ and 4/4 time).  
+          //384 = 1 bar, 1536 = 4 bars, 3072 = 8 bars, 4608 = 12 bars.  
+          int bars;
+
+          bars = (int(fbars));            
+          tick_count =  (tick_count - (bars * 384) );  // -16;
+          //   tick_count=0;
+          SMF.setDelta(0);
+          SMF.setTickCount(0); 
+        }
+
+      }  //end of file IF.
+      //
     }
     sync24PPQ++;
     tick_count++; //COUNT THE TICKS SO YOU CAN CALCULATE HOW MUCH TIME HAS PASSED SO YOU CAN PLAY IN TIME IN THE MFTRACK CODE.
@@ -899,10 +933,9 @@ void midiTimer()
 
     if (sync24PPQ >= 4) {
       sync24PPQ = 0;    
-      SMF.setTick(0);
-
-
-
+      SMF.setTick(0);  //technically, I don't need to set a tick to off or on in order to check anything except weather to send a clock signal
+                      //      , because the timer's frequency is set to 96ppq, so each time it calls Play, it will never be too soon.  ?
+      
       if(!SMF.isEOF() )
       { 
         Play();
@@ -910,6 +943,8 @@ void midiTimer()
       else
       {
 
+ // if(SMF.isEOF()){
+    
         SMF.close(); 
 
         if (Play_setup())  //this is the code that handles the looping of the midi files
@@ -981,10 +1016,10 @@ void FileNameCheck()   //this handles setting up a file to play and also lets me
   }
   else  //the next file differs from the one just played.
   {
-    SMF.setFilename(nameFiles[P]);   //this means the next cued up file is different than the previous one.
+    SMF.setFilename(nameFiles[filePOS]);   //this means the next cued up file is different than the previous one.
     //  // err = SMF.load();    //test to see if this works
     oldP = P;
-    filePOS= P;
+    filePOS= P+1;
     // draw_menu();  this messes up the timing.
 setCurrentSong();
     tft.drawRect(30, 20, 128, 8, ST7735_BLACK);
@@ -1168,7 +1203,7 @@ void setNext(){
         tft.fillRect(35, 30 , 128, 8, ST7735_BLACK); 
         tft.setCursor(35,30);
         tft.setTextColor(YELLOW);
-        tft.println(nameFiles[P]);
+        tft.println(nameFiles[filePOS]);
   
 }
 
@@ -1201,8 +1236,8 @@ void HandleNoteOn (byte commandByte, byte inNote, byte invelocity){
       }
       break;
     case 13: //note value of C4  or 0x3C, handles program change 'up'
-      if (P == maxmidicount-1){    //this notes that the program is at the highest of 127 and needs reset to 0
-        P=1;
+      if (P == maxmidicount-2){    //this notes that the program is at the highest of 127 and needs reset to 0
+        P=0;
         sendChangeControl(99,05,10);  //double check these control change msgs
         sendChangeControl(98,107,10);
         sendChangeControl(06,0,10);
@@ -1210,7 +1245,8 @@ void HandleNoteOn (byte commandByte, byte inNote, byte invelocity){
         sendChangeControl(98,108,10);
         sendChangeControl(06,0,10);
         sendProgramChange(P,10);
-        filePOS=P;
+        filePOS=(P+1);
+        listStart=filePOS;
         setNextSong();
         draw_menu();
 
@@ -1232,7 +1268,8 @@ void HandleNoteOn (byte commandByte, byte inNote, byte invelocity){
         sendChangeControl(98,108,10);
         sendChangeControl(06,0,10);
         sendProgramChange(P,10);
-        filePOS=P;
+        filePOS=(P+1);
+        listStart=filePOS;
 setNextSong();
         draw_menu();
 
@@ -1245,8 +1282,8 @@ setNextSong();
       }
       break;
     case 14: // note value of D4  or 0x3E, handles program change 'down'.
-      if (P== 1){
-        P=maxmidicount-1;
+      if (P== 0){
+        P=maxmidicount-2;
         sendChangeControl(99,05,10);
         sendChangeControl(98,107,10);
         sendChangeControl(06,0,10);
@@ -1254,7 +1291,8 @@ setNextSong();
         sendChangeControl(98,108,10);
         sendChangeControl(06,0,10);
         sendProgramChange(P,10); 
-        filePOS=P;
+        filePOS=(P+1);
+        listStart=filePOS;
 setNextSong();
         draw_menu();
      //  setNext();
@@ -1277,7 +1315,8 @@ setNextSong();
         sendChangeControl(98,108,10);
         sendChangeControl(06,0,10);
         sendProgramChange(P,10);
-        filePOS=P;
+        filePOS=(P+1);
+        listStart=filePOS;
 setNextSong();
          draw_menu();
       //  setNext();

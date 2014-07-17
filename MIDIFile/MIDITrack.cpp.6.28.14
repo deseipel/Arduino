@@ -131,27 +131,49 @@ bpm = mf->getTempo();
 	//                                                            the length of one tick.//
 	
 	deltaT = readVarLen(&mf->_fd);   //this calls the readVarLen in the MIDIHelper.cpp file.
+	//mf->setDelta(deltaT);
+	//need to account for multiple events with the same delta  (CHORDS)
+	
+	/*  THIS SHOWS A RUNNING TOTAL, NOT THE ACTUAL DELTAS.  (120PPQ).
+660 On ch=2 n=c4 v=125
+660 On ch=2 n=a4 v=125
+660 On ch=2 n=f4 v=125
+660 On ch=2 n=c5 v=125
+660 On ch=2 n=e5 v=125
+719 Off ch=2 n=e5 v=0			SO THIS CHORD LASTS AN 1/8TH NOTE = 60 TICKS.
+719 Off ch=2 n=f4 v=0
+719 Off ch=2 n=c5 v=0
+719 Off ch=2 n=a4 v=0
+	
+	*/
+	
+/* 	if (deltaT > total_deltas){
+	total_deltas = ( mf->getDelta() +  deltaT  )  ; 
+	}
+	else
+	{
+	total_deltas = mf->getDelta();
+	} */
+	
 	total_deltas = ( mf->getDelta() +  deltaT  )  ; // add the old delta time to the new one.
 	//need to code a way to keep a running total of the deltas	?
 	
 	//  if (elapsedTicks < deltaT)  //part of the original code, comparing elapsed ticks and the read delta.
-	//	return(false);  
-		
-		
-		if (tickCount < total_deltas)  //
+	//	return(false);  		
+	
+	if (tickCount < total_deltas)  //
+	//if(tickCount < deltaT)
 		{
 		total_deltas=(mf->getDelta());
 		mf->setDelta(mf->getDelta());
 		return (false);
 		
 		}
-		
 	
 	_elapsedTimeTotal -= (deltaT * (60000000L/(96 * bpm)));
-	mf->setTickCount( total_deltas);
+	//mf->setTickCount( total_deltas);
 	
-	
-	mf->setDelta(total_deltas);
+	mf->setDelta(total_deltas);  //do not comment out 7.17.14.des  
 	parseEvent(mf);
 
 	//mf->setTickCount(0);

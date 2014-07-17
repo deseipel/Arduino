@@ -1,5 +1,5 @@
 /*
-  MIDITrack.cpp - An Arduino library for processing Standard MIDI Files (SMF).
+  MIDIFile.cpp - An Arduino library for processing Standard MIDI Files (SMF).
   Copyright (C) 2012 Marco Colli
   All rights reserved.
 
@@ -19,548 +19,532 @@
   License along with this library; if not, write to the Free Software
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
+
 #include <string.h>
 #include "MIDIFile.h"
 #include "MIDIHelper.h"
 
 ////////////////////////////////////////
-// MFTrack Class code
+// MIDIFile Class
 //
 
-void MFTrack::reset(void)
+// Events may be processed in 2 different ways. One way is to give priority to all 
+// events on one track before moving on to the next TRACK (TRACK_PRIORITY) or to process 
+// one event from each track and cycling through all tracks roound robin fashion until 
+// no events are left to be processed (EVENT_PRIORITY). The define below allows changing 
+// the mode of operation implemented in getNextEvent().
+//
+#define	 TRACK_PRIORITY 0
+
+void MIDIFile::initialise(void)
 {
-	_length = 0;        // length of track in bytes
-    _startOffset = 0;   // start of the track in bytes from start of file
-	_currOffset = 0;
-	_endOfTrack = false;
-	_elapsedTimeTotal = 0;
-	_trackId = 255;
-//	_Ttick = 0;
-   // _Tcount = 0;
-	//_delta = 0; 
-	//setDelta(0);
+  _trackCount = 0;            // # of tracks in file
+  _format = 0;
+  _lastEventCheckTime = 0;
+  _syncAtStart = false;
+  _paused = false;
+  _tick = 0;
+  _Tcount = 0;
+  _etime = 0;
+  _delta = 0; 
+  setMidiHandler(NULL);
+  setSysexHandler(NULL);
+
+  // File handling
+  setFilename("");
+  _sd = NULL;
+
+  // Set MIDI defaults
+  setTicksPerQuarterNote(96);	  // 24 ticks per quarter note
+  setTempo(120);				  // 120 beats per minute
+  setTimeSignature(4, 4);		  // 4/4 time
 }
 
-MFTrack::MFTrack(void)
+void MIDIFile::synchTracks(void)
 {
-	reset();
+	for (uint8_t i=0; i<_trackCount; i++)
+		_track[i].syncTime();
+	_lastEventCheckTime = micros();
 }
 
-MFTrack::~MFTrack()
-{
+MIDIFile::MIDIFile(void) 
+{ 
+	initialise();
 }
 
-void MFTrack::close(void)
-{
-	reset();
+MIDIFile::~MIDIFile() 
+{ 
+  close();
 }
 
-uint32_t MFTrack::getLength(void)
-// size of track in bytes
+void MIDIFile::begin(SdFat *psd)
 {
-  return _length;
+	_sd = psd;
 }
 
-bool MFTrack::getEndOfTrack(void)
-// true if end of track has been reached
+void MIDIFile::close()
+// Close out - should be ready for the next file
 {
-  return _endOfTrack;
+  for (uint8_t i = 0; i<_trackCount; i++)
+  {
+	  _track[i].close();
+  }
+  _trackCount = 0;
+  _syncAtStart = false;
+  _paused = false;
+  _tick = 0;
+ _etime = 0;
+  setFilename("");
+  _fd.close();
+  //_Tcount = 0;
+  //_delta = 0;
 }
 
-void MFTrack::syncTime(void)
+void MIDIFile::setFilename(const char* aname) 
+// sets the filename of the MIDI file.
+// expects it to be in 8.3 format.
 {
-	_elapsedTimeTotal = 0;
+	if (aname != NULL)
+		strcpy(_fileName, aname);
 }
 
-void MFTrack::restart(void)
-// Start playing the track from the beginning again
+const char* MIDIFile::getFilename(void) 
+// returns the name of the current file
 {
-	_currOffset = 0;
+  return _fileName;
 }
 
-/* void MFTrack::setTTick(byte tick)
-{
-   _Ttick = tick; 
+uint8_t MIDIFile::getTrackCount(void) 
+// return the number of tracks in the Midi File.
+{ 
+  return _trackCount;
 }
 
-byte MFTrack::getTTick()
-{
-return _Ttick;
-} */
-
-/* void MFTrack::setTickCount(unsigned long Tcount)
-{
- _Tcount = Tcount;
+uint8_t MIDIFile::getFormat(void) 
+// return the format of the MIDI File.
+{ 
+  return _format;
 }
 
-unsigned long 	MFTrack::getTickCount()
-{  
-    return _Tcount;
-} */
+uint16_t MIDIFile::getTempo(void)
+{
+  return _tempo;
+}
 
-/* void MFTrack::setDelta(uint32_t delta)
+void MIDIFile::setTempo(uint16_t t)
+{
+  _tempo = t;
+  calcMicrosecondDelta();
+}
+
+uint16_t MIDIFile::getTimeSignature(void)
+{
+  return ((_timeSignature[0]<<8) + _timeSignature[1]);
+}
+
+void MIDIFile::setTimeSignature(uint8_t n, uint8_t d)
+{
+  _timeSignature[0] = n;
+  _timeSignature[1] = d;
+  calcMicrosecondDelta();
+}
+
+void MIDIFile::setTicksPerQuarterNote(uint16_t ticks) 
+{
+  _ticksPerQuarterNote = ticks;
+  calcMicrosecondDelta();
+}
+
+uint16_t MIDIFile::getTicksPerQuarterNote(void) 
+{ 
+  return _ticksPerQuarterNote;
+}
+
+void MIDIFile::calcMicrosecondDelta(void) 
+// 1 tick = microseconds per beat / ticks per Q note
+// The variable "microseconds per beat" is specified by a MIDI event carrying 
+// the set tempo meta message. If it is not specified then it is 500,000 microseconds 
+// by default, which is equivalent to 120 beats per minute. 
+// If the MIDI time division is 60 ticks per beat and if the microseconds per beat 
+// is 500,000, then 1 tick = 500,000 / 60 = 8333.33 microseconds.
+{
+    if ((_tempo != 0) && (_ticksPerQuarterNote != 0))
+	{
+		_microsecondDelta = (60 * 1000000L) / _tempo;	// microseconds per beat
+		_microsecondDelta = _microsecondDelta / _ticksPerQuarterNote;	// microseconds per tick
+	}
+}
+
+void MIDIFile::setMicrosecondPerQuarterNote(uint32_t m)
+// This is the value given in the META message setting tempo
+{
+	_microsecondDelta = m / _ticksPerQuarterNote;
+
+	// work out the tempo from the delta by reversing the calcs in calcMicrosecondsDelta
+	// m is alreay per quarter note
+	_tempo = (60 * 1000000L) / m;
+}
+
+uint32_t MIDIFile::getMicrosecondDelta(void) 
+{
+	return _microsecondDelta;
+}
+
+void MIDIFile::setMidiHandler(void (*mh)(midi_event *pev))
+{
+	_midiHandler = mh;
+}
+
+void MIDIFile::setSysexHandler(void (*sh)(sysex_event *pev))
+{
+	_sysexHandler = sh;
+}
+
+bool MIDIFile::isEOF(void)
+{
+	for (uint8_t i=0; i<_trackCount; i++)
+	 {
+		 if (! _track[i].getEndOfTrack()) return false;  // breaks at first false
+	 }
+	 return true;
+}
+
+void MIDIFile::pause(bool bMode)
+// Start pause when true and restart when false
+{
+	_paused = bMode;
+
+	if (!_paused)				// restarting so ..
+		_syncAtStart = false;	// .. force a time resynch when next processing events
+}
+
+void MIDIFile::restart(void)
+// Reset the file to the start of all tracks
+{
+	for (uint8_t i=0; i<_trackCount; i++)
+		_track[i].restart();
+
+	_syncAtStart = false;		// force a time resych
+}
+
+void MIDIFile::setTick(byte tick)
+{
+   _tick = tick; 
+}
+
+void MIDIFile::setDelta(uint32_t delta)
 {
 _delta = delta;
 }
 
-uint32_t MFTrack::getDelta()
+uint32_t MIDIFile::getDelta()
 {
 return _delta;
-} */
+}
 
-bool MFTrack::PlayTracks(MIDIFile *mf,  uint32_t elapsedTime )
+byte MIDIFile::getTick()
 {
-uint32_t deltaT, elapsedTicks, total_deltas;
-uint8_t bpm;
-uint32_t tickCount; 
+return _tick;
+}
 
-tickCount = mf->getTickCount();   //this is where I set the tickCount, which is a running total of how many ticks have passed.
-bpm = mf->getTempo();
+void MIDIFile::setTickCount(long long Tcount)
+{
+ _Tcount = Tcount;
+}
 
-// is there anything to process?
-	if (_endOfTrack)
-	  return(false);	 
-	 
-	// move the file pointer to where we left off
-	mf->_fd.seekSet(_startOffset+_currOffset);	
+long long 	MIDIFile::getTickCount()
+{  
+    return _Tcount;
+}
+
+void MIDIFile::setLastTime(unsigned long etime)
+{
+_etime = etime;
+}
+
+unsigned long MIDIFile::getLastTime()
+{
+return _etime;
+}
+
+bool MIDIFile::Play(void)
+{
+long unsigned  elapsedTime;
+uint8_t track_count = getTrackCount();
+	uint8_t		n;	
+int bpm = getTempo();	
 	
-	// work out new total elapsed time
-	_elapsedTimeTotal += elapsedTime;
-	//elapsedTicks = ((tickCount * (60000000/(24 * bpm))) / (60000000/(24 * bpm)) );  //no worky.
-	elapsedTicks = _elapsedTimeTotal / (60000000L/(96 * bpm));  //original part of the library code.  This ultimately uses elapsed time and divides it by 
-	//                                                            the length of one tick.//
+	// if we are paused we are paused!
+	if (_paused) return false;
 	
-	deltaT = readVarLen(&mf->_fd);   //this calls the readVarLen in the MIDIHelper.cpp file.
-	//mf->setDelta(deltaT);
-	//need to account for multiple events with the same delta  (CHORDS)
-	
-	/*  THIS SHOWS A RUNNING TOTAL, NOT THE ACTUAL DELTAS.  (120PPQ).
-660 On ch=2 n=c4 v=125
-660 On ch=2 n=a4 v=125
-660 On ch=2 n=f4 v=125
-660 On ch=2 n=c5 v=125
-660 On ch=2 n=e5 v=125
-719 Off ch=2 n=e5 v=0			SO THIS CHORD LASTS AN 1/8TH NOTE = 60 TICKS.
-719 Off ch=2 n=f4 v=0
-719 Off ch=2 n=c5 v=0
-719 Off ch=2 n=a4 v=0
-	
-	*/
-	
-/* 	if (deltaT > total_deltas){
-	total_deltas = ( mf->getDelta() +  deltaT  )  ; 
-	}
-	else
+	// sync start all the tracks if we need to
+	if (!_syncAtStart)
 	{
-	total_deltas = mf->getDelta();
-	} */
+		synchTracks();
+		_syncAtStart = true;
+	}	
+	_tick = getTick();	
 	
-	total_deltas = ( mf->getDelta() +  deltaT  )  ; // add the old delta time to the new one.
-	//need to code a way to keep a running total of the deltas	?
+	//elapsedTime = (micros() - _lastEventCheckTime);
+	elapsedTime = (getLastTime() - _lastEventCheckTime);
+	//  IF THE TIMER'S FREQUENCY IS SET TO 96PPQ THEN EACH TIME PLAY IS CALLED, IT SHOULD NEVER BE TOO SOON, AND THEREFORE NO REASON TO CHECK IT? 
+	// TURNING THE TICK CHECK OFF.  -- NO, this check appears to improve the loop timing somehow. (tick is on the downbeat probably).
+	//  need to find another way, perhaps.  might end up using the getLastTime() after all.
 	
-	//  if (elapsedTicks < deltaT)  //part of the original code, comparing elapsed ticks and the read delta.
-	//	return(false);  		
+	//if (_tick ==0) return false;  //tick is set in the midi timer, during the time when MIDI clock sync is set. 
+if (elapsedTime < (((60 * 1000000L) / bpm)/96))
+		return false;	
+	_lastEventCheckTime = micros();	
+//	_lastEventCheckTime= getLastTime();
 	
-	if (tickCount < total_deltas)  //
-	//if(tickCount < deltaT)
+	//if (_format != 0) DUMPS("\n-- TRK "); 
+	
+	//begin track priority
+#if TRACK_PRIORITY	
+	// process all events from each track first - TRACK PRIORITY
+	for (uint8_t i = 0; i < track_count; i++)
+	{
+		//if (_format != 0) DUMPX(i);
+		// Limit n to be a sensible number of events in the loop counter
+		// When there are no more events, just break out
+		// Other than the first event, the other have an elapsed time of 0 (ie occur simultaneously)
+		for (n=0; n < 200; n++)
 		{
-		total_deltas=(mf->getDelta());
-		mf->setDelta(mf->getDelta());
-		return (false);
+			//if (!_track[i].getNextEvent(this, (n==0 ? elapsedTime : 0)))
+			if (!_track[i].PlayTracks(this, (n==0 ? elapsedTime : 0)));
+			
+				break;
+			
+		}
 		
-		}
-	
-	_elapsedTimeTotal -= (deltaT * (60000000L/(96 * bpm)));
-	//mf->setTickCount( total_deltas);
-	
-	mf->setDelta(total_deltas);  //do not comment out 7.17.14.des  
-	parseEvent(mf);
+    }
+//setTickCount(0); 
 
-	//mf->setTickCount(0);
-	
-	// remember the offset for next time
-	_currOffset = mf->_fd.curPosition() - _startOffset;
-	return (true);
+#else // EVENT_PRIORITY
+	// process one event from each track round-robin style - EVENT PRIORITY
+	bool doneEvents1;
+
+	// Limit n to be a sensible number of events in the loop counter
+	for (n = 0; (n < 200) && (!doneEvents1); n++)
+	{
+		doneEvents1 = false;
+
+		for (uint8_t i = 0; i < _trackCount; i++)	// cycle through all
+		{
+			bool	bb;
+
+			if (_format != 0) DUMPX(i);
+			// Other than the first event, the other have an elapsed time of 0 (ie occur simultaneously)
+			bb = _track[i].PlayTracks(this, (n==0 ? elapsedTime : 0));
+			if ((bb) && (_format != 0)) DUMPS("\n-- TRK "); 
+			//doneEvents1 ||= bb;   //won't compile.
+			doneEvents1= (doneEvents1 || bb);
+		}
+
+		// When there are no more events, just break out
+		if (!doneEvents1)
+			break;
+	} 
+#endif // EVENT/TRACK_PRIORITY
+return true;
+
 }
 
 
-bool MFTrack::getNextEvent(MIDIFile *mf, uint32_t elapsedTime)
-// track_event = <time:v> + [<midi_event> | <meta_event> | <sysex_event>]
+
+
+
+boolean MIDIFile::getNextEvent(void)
 {
-	uint32_t deltaT, elapsedTicks;
+	uint32_t	elapsedTime;
+	uint8_t		n;
 
-	// is there anything to process?
-	if (_endOfTrack)
-	  return(false);
+	// if we are paused we are paused!
+	if (_paused) return false;
 
-	// move the file pointer to where we left off
-	mf->_fd.seekSet(_startOffset+_currOffset);
+	// sync start all the tracks if we need to
+	if (!_syncAtStart)
+	{
+		synchTracks();
+		_syncAtStart = true;
+	}
 
-	// work out new total elapsed time
-	_elapsedTimeTotal += elapsedTime;
-	elapsedTicks = _elapsedTimeTotal / mf->getMicrosecondDelta();
-	
-	/*
-	example:  at 100 bpm, getMicrosecondDelta() = 25000 microseconds per tick.  
-	so if 1 second has elapsed, which equals 1000000 microseconds, then:
-	
-	1000000/25000 =  40 ticks.  
-	
-	
-	*/
+	// check if enough time has passed for a MIDI tick
+	elapsedTime = micros() - _lastEventCheckTime;
+	if (elapsedTime < _microsecondDelta)
+		return false;	
+	_lastEventCheckTime = micros();			// save for next round of checks
 
-	// Get the DeltaT from the file in order to see if enough ticks have
-	// passed for the event to be active. If not, just return without
-	// saving the file pointer and we will go back to the same spot next time.
-	deltaT = readVarLen(&mf->_fd);
-	if (elapsedTicks < deltaT)
-		return(false);
+	if (_format != 0) DUMPS("\n-- TRK "); 
 
-	// Adjust the total elapsed time. Note use of actual DeltaT to avoid 
-	// accumulation of errors as we only check for elaspedTime being >= ticks,
-	// giving positive biased errors every time.
-	_elapsedTimeTotal -= (deltaT * mf->getMicrosecondDelta());
+#if TRACK_PRIORITY
+	// process all events from each track first - TRACK PRIORITY
+	for (uint8_t i = 0; i < _trackCount; i++)
+	{
+		if (_format != 0) DUMPX(i);
+		// Limit n to be a sensible number of events in the loop counter
+		// When there are no more events, just break out
+		// Other than the first event, the other have an elapsed time of 0 (ie occur simultaneously)
+		for (n=0; n < 100; n++)
+		{
+			if (!_track[i].getNextEvent(this, (n==0 ? elapsedTime : 0)))
+				break;
+		}
 
-	DUMPS("\ndT: ");
-	DUMP(deltaT);
-	DUMP("\tET: ");
-	DUMP(elapsedTicks);
-	DUMP('\t');
+		if ((n > 0) && (_format != 0))
+			DUMPS("\n-- TRK "); 
+	}
+#else // EVENT_PRIORITY
+	// process one event from each track round-robin style - EVENT PRIORITY
+	bool doneEvents;
 
-	parseEvent(mf);
+	// Limit n to be a sensible number of events in the loop counter
+	for (n = 0; (n < 100) && (!doneEvents); n++)
+	{
+		doneEvents = false;
 
-	// remember the offset for next time
-	_currOffset = mf->_fd.curPosition() - _startOffset;
+		for (uint8_t i = 0; i < _trackCount; i++)	// cycle through all
+		{
+			bool	b ;
 
-	return(true);
+			if (_format != 0) DUMPX(i);
+			// Other than the first event, the other have an elapsed time of 0 (ie occur simultaneously)
+			b = _track[i].getNextEvent(this, (n==0 ? elapsedTime : 0));
+			if (b && (_format != 0))
+				DUMPS("\n-- TRK "); 
+			//doneEvents ||= b;
+			doneEvents = (doneEvents || b);
+		}
+
+		// When there are no more events, just break out
+		if (!doneEvents)
+			break;
+	} 
+#endif // EVENT/TRACK_PRIORITY
+
+	return true;
 }
 
-void MFTrack::parseEvent(MIDIFile *mf)
-// process the event from the physical file
-{
-	uint8_t	 eType;
-	uint32_t eLen, mLen;
-	sysex_event	sev;		// used for sysex callback function
-
-	// now we have to process this event
-	eType = mf->_fd.read();
-
-	switch (eType)
-	{
-// ---------------------------- MIDI
-
-	  // midi_event = any MIDI channel message, including running status
-	  // Midi events (status bytes 0x8n - 0xEn) The standard Channel MIDI messages, where 'n' is the MIDI channel (0 - 15).
-	  // This status byte will be followed by 1 or 2 data bytes, as is usual for the particular MIDI message. 
-	  // Any valid Channel MIDI message can be included in a MIDI file.
-	case 0x80 ... 0xBf:	// MIDI message with 2 parameters
-	case 0xe0 ... 0xef:
-		_mev.size = 3;
-		_mev.data[0] = eType;
-		_mev.channel = _mev.data[0] & 0xf;	// mask off the channel
-		_mev.data[0] = _mev.data[0] & 0xf0;	// just the command byte
-		_mev.data[1] = mf->_fd.read();
-		_mev.data[2] = mf->_fd.read();
-		DUMPS("[MID2] Ch: ");
-		DUMP(_mev.channel);
-		DUMPS(" Data: ");
-		DUMPX(_mev.data[0]);
-		DUMP(' ');
-		DUMPX(_mev.data[1]);
-		DUMP(' ');
-		DUMPX(_mev.data[2]);
-#if !DUMP_DATA
-		if (mf->_midiHandler != NULL)
-			(mf->_midiHandler)(&_mev);
-#endif // !DUMP_DATA
-	break;
-
-	case 0xc0 ... 0xdf:	// MIDI message with 1 parameter
-		_mev.size = 2;
-		_mev.data[0] = eType;
-		_mev.channel = _mev.data[0] & 0xf;	// mask off the channel
-		_mev.data[0] = _mev.data[0] & 0xf0;	// just the command byte
-		_mev.data[1] = mf->_fd.read();
-		DUMPS("[MID1] Ch: ");
-		DUMP(_mev.channel);
-		DUMPS(" Data: ");
-		DUMPX(_mev.data[0]);
-		DUMP(' ');
-		DUMPX(_mev.data[1]);
-
-#if !DUMP_DATA
-		if (mf->_midiHandler != NULL)
-			(mf->_midiHandler)(&_mev);
-#endif
-	break;
-
-	case 0x00 ... 0x7f:	// MIDI run on message
-	{
-	  // If the first (status) byte is less than 128 (0x80), this implies that MIDI 
-	  // running status is in effect, and that this byte is actually the first data byte 
-	  // (the status carrying over from the previous MIDI event). 
-	  // This can only be the case if the immediately previous event was also a MIDI event, 
-	  // ie SysEx and Meta events clear running status. This means that the _mev structure 
-	  // should contain the info from the previous message in the structure's channel member 
-	  // and data[0] (for the MIDI command). 
-	  // Hence start saving the data at byte data[1] with the byte we have just read (eType) 
-	  // and use the size member to determine how large the message is (ie, same as before).
-	  _mev.data[1] = eType;
-	  for (uint8_t i = 2; i < _mev.size; i++)
-	  {
-		_mev.data[i] = mf->_fd.read();	// next byte
-	  }	
-
-	  DUMPS("[MID+] Ch: ");
-	  DUMP(_mev.channel);
-	  DUMPS(" Data: ");
-	  for (uint8_t i = 0; i<_mev.size; i++)
-	  {
-  		DUMPX(_mev.data[i]);
-		DUMP(' ');
-	  }
-
-#if !DUMP_DATA
-	  if (mf->_midiHandler != NULL)
-		(mf->_midiHandler)(&_mev);
-#endif
-	}
-	break;
-	  
-// ---------------------------- SYSEX
-
-	case 0xf0:		// sysex_event = 0xF0 + <len:1> + <data_bytes> + 0xF7 
-	case 0xf7:		// sysex_event = 0xF7 + <len:1> + <data_bytes> + 0xF7 
-	{
- 		uint8_t	c, i;
-		sysex_event sev;
-
-		// collect all the bytes until the 0xf7 - boundaries are included in the message
-		sev.track = _trackId;
-		sev.data[0] = eType;
-		sev.size = mf->_fd.read();
-		// The length parameter includes the 0xF7 but not the start boundary. 
-		// However, it may be bigger than our buffer will allow us to store.
-		#define	BUF_SIZE	(sizeof(sev.data)/sizeof(sev.data[0]))	
-		sev.size = (sev.size > BUF_SIZE - 2 ? BUF_SIZE-2 : sev.size + 1);
-		for (i = 1; (i < sev.size) && (c != 0xf7); i++)
-		{
-			c = mf->_fd.read();	// next char
-			sev.data[i] = c;
-		}	
-
-		// check if we had an overflow
-		if (c != 0xf7)
-		{
-			while ((c = mf->_fd.read()) != 0xf7)
-				; // skip read all data
-			sev.data[sev.size] = 0xf7;		// terminate properly - data is probably nuked anyway
-		}
-
-		DUMPS("[SYSX] Data: ");
-		for (uint8_t i = 0; i<sev.size; i++)
-		{
-  			DUMPX(sev.data[i]);
-			DUMP(' ');
-		}
-
-#if !DUMP_DATA
-		if (mf->_sysexHandler != NULL)
-			(mf->_sysexHandler)(&sev);
-#endif
-	}
-	break;
-
-// ---------------------------- META
-
-	case 0xff:		// meta_event = 0xFF + <meta_type:1> + <length:v> + <event_data_bytes>
-	  eType = mf->_fd.read();
-	  mLen =  readVarLen(&mf->_fd);
-	  DUMPS("[META] Type: 0x");
-	  DUMPX(eType);
-	  DUMPS("\tLen: ");
-	  DUMP(mLen);
-	  DUMP('\t');
-
-	  switch (eType)
-	  {
-	  case 0x2f:	// End of track
-		_endOfTrack = true;
-	    DUMPS("END OF TRACK");
-	  break;
-
-	  case 0x51:	// set Tempo - really the microseconds per tick
-		mf->setMicrosecondPerQuarterNote(readMultiByte(&mf->_fd, MB_TRYTE));
-		DUMPS("SET TEMPO to ");
-		DUMP(mf->getMicrosecondDelta());
-		DUMPS(" us/tick or ");
-		DUMP(mf->getTempo());
-		DUMPS(" beats/min");
-	  break;
-
-	  case 0x58:	// time signature
-		mf->setTimeSignature(mf->_fd.read(), (2 << mf->_fd.read()));	// denominator is 2^n
-		mf->_fd.seekCur(mLen-2);
-		DUMPS("SET TIME SIGNATURE to ");
-		DUMP(mf->getTimeSignature()>>8);
-		DUMP('/');
-		DUMP(mf->getTimeSignature()&0xf);
-	  break;
-
-#if SHOW_UNUSED_META
-	  case 0x0:	// Sequence Number
-		DUMPS("SEQUENCE NUMBER ");
-		DUMP(readMultiByte(&mf->_fd, MB_WORD));
-	  break;
-
-	  case 0x1:	// Text
-		DUMPS("TEXT ");
-		for (int i=0; i<mLen; i++)
-			DUMP((char)mf->_fd.read());
-	  break;
-
-	  case 0x2:	// Copyright Notice
-		DUMPS("COPYRIGHT ");
-		for (uint8_t i=0; i<mLen; i++)
-			DUMP((char)mf->_fd.read());
-	  break;
-
-	  case 0x3:	// Sequence or Track Name
-		DUMPS("SEQ/TRK NAME ");
-		for (uint8_t i=0; i<mLen; i++)
-			DUMP((char)mf->_fd.read());
-	  break;
-
-	  case 0x4:	// Instrumenmt Name
-		DUMPS("INSTRUMENT ");
-		for (uint8_t i=0; i<mLen; i++)
-			DUMP((char)mf->_fd.read());
-	  break;
-
-	  case 0x5:	// Lyric
-		DUMPS("LYRIC ");
-		for (uint8_t i=0; i<mLen; i++)
-			DUMP((char)mf->_fd.read());
-	  break;
-
-	  case 0x6:	// Marker
-		DUMPS("MARKER ");
-		for (uint8_t i=0; i<mLen; i++)
-			DUMP((char)mf->_fd.read());
-	  break;
-
-	  case 0x7:	// Cue Point
-		DUMPS("CUE POINT ");
-		for (uint8_t i=0; i<mLen; i++)
-			DUMP((char)mf->_fd.read());
-	  break;
-
-	  case 0x20:// Channel Prefix
-		DUMPS("CHANNEL PREFIX ");
-		DUMP(readMultiByte(&mf->_fd, MB_BYTE));
-	  break;
-
-	  case 0x21:// Port Prefix
-		DUMPS("PORT PREFIX ");
-		DUMP(readMultiByte(&mf->_fd, MB_BYTE));
-	  break;
-
-	  case 0x54:// SMPTE Offset
-		DUMPS("SMPTE OFFSET ");
-		for (uint8_t i=0; i<mLen; i++)
-		{
-			DUMP(mf->_fd.read());
-			DUMP(' ');
-		}
-	  break;
-
-	  case 0x59:// Key Signature
-		DUMPS("KEY SIGNATURE ");
-		for (uint8_t i=0; i<mLen; i++)
-		{
-			DUMP(mf->_fd.read());
-			DUMP(' ');
-		}
-	  break;
-
-	  case 0x7F:	// Sequencer Specific Metadata
-		DUMPS("SEQ SPECIFIC ");
-		for (uint8_t i=0; i<mLen; i++)
-		{
-			DUMPX(mf->_fd.read());
-			DUMP(' ');
-		}
-	  break;
-#endif // SHOW_UNUSED_META
-
-	  default:
-		mf->_fd.seekCur(mLen);
-		DUMPS("IGNORED");
-	  }
-	  break;
-
-// ---------------------------- UNKNOWN
-
-	default:
-		// stop playng this track as we cannot identify the eType
-		_endOfTrack = true;	
-		DUMPS("[UKNOWN 0x");
-		DUMPX(eType);
-		DUMPS("] Track aborted");
-	}
-}
-
-int MFTrack::load(uint8_t trackId, MIDIFile *mf)
+int MIDIFile::load() 
+// load the MIDI file into memory ready for processing
 {
   uint32_t  dat32;
   uint16_t  dat16;
-
-  // save the trackid for use later
-  _trackId = _mev.track = trackId;
   
-  // Read the Track header
-  // track_chunk = "MTrk" + <length:4> + <track_event> [+ <track_event> ...]
+  if (_fileName[0] == '\0')  
+    return(0);
+
+  // open the file for reading:
+  if (!_fd.open(_fileName, O_READ)) 
+    return(2);
+
+  // Read the MIDI header
+  // header chunk = "MThd" + <header_length:4> + <format:2> + <num_tracks:2> + <time_division:2>
   {
     #define HDR_SIZE  4
     char    h[HDR_SIZE+1]; // Header characters + nul
   
-	mf->_fd.fgets(h, HDR_SIZE+1);
+    _fd.fgets(h, HDR_SIZE+1);
     h[HDR_SIZE] = '\0';
-
-    if (strcmp(h, "MTrk") != 0)
-      return(0);
+    
+    if (strcmp(h, "MThd") != 0)
+	{
+	  _fd.close();
+      return(3);
+	}
   }
+  
+  // read header size
+  dat32 = readMultiByte(&_fd, MB_LONG);
+  if (dat32 != 6)   // must be 6 for this header
+  {
+	_fd.close();
+    return(4);
+  }
+  
+  // read file type
+  dat16 = readMultiByte(&_fd, MB_WORD);
+  if ((dat16 != 0) && (dat16 != 1))
+  {
+	_fd.close();
+    return(5);
+  }
+  _format = dat16;
+ 
+   // read number of tracks
+  dat16 = readMultiByte(&_fd, MB_WORD);
+  if ((_format == 0) && (dat16 != 1)) 
+  {
+	_fd.close();
+    return(6);
+  }
+  if (dat16 > MIDI_MAX_TRACKS)
+  {
+	_fd.close();
+	return(7);
+  }
+  _trackCount = dat16;
 
-  // Row read track chunk size and in bytes. This is not really necessary 
-  // since the track MUST end with an end of track meta event.
-  dat32 = readMultiByte(&mf->_fd, MB_LONG);
-  _length = dat32;
+   // read ticks per quarter note
+  dat16 = readMultiByte(&_fd, MB_WORD);
+  if (dat16 & 0x8000) // top bit set is SMTE format
+  {
+      int framespersecond = (dat16 >> 8) & 0x00ff;
+      int resolution      = dat16 & 0x00ff;
 
-  // save where we are in the file as this is the start of offset for this track
-  _startOffset = mf->_fd.curPosition();
-  _currOffset = 0;
+      switch (framespersecond) {
+        case 232:  framespersecond = 24; break;
+        case 231:  framespersecond = 25; break;
+        case 227:  framespersecond = 29; break;
+        case 226:  framespersecond = 30; break;
+        default:   _fd.close();	return(7);
+      }
+      dat16 = framespersecond * resolution;
+   } 
+   _ticksPerQuarterNote = dat16;
+   calcMicrosecondDelta();	// we may have changed from default, so recalculate
 
-  // Advance the file pointer to the start of the next track;
-  if (mf->_fd.seekSet(_startOffset+_length) == -1)
-	  return(1);
+   // load all tracks
+   for (uint8_t i = 0; i<_trackCount; i++)
+   {
+	   int err;
+	   
+	   if ((err = _track[i].load(i, this)) != -1)
+	   {
+		   _fd.close();
+		   return((10*(i+1))+err);
+	   }
+   }
 
   return(-1);
 }
 
-#if DUMP_DATA
-void MFTrack::dump(void)
+void MIDIFile::dump(void)
 {
-	DUMPS("\n[Track ");
-	DUMP(_trackId);
-	DUMPS(" Header]");
-	DUMPS("\nLength:\t\t\t");
-	DUMP(_length);
-	DUMPS("\nFile Location:\t\t");
-    DUMP(_startOffset);
-	DUMPS("\nEnd of Track:\t\t");
-	DUMP(_endOfTrack);
-	DUMPS("\nCurrent buffer offset:\t");
-	DUMP(_currOffset);
-}
+  DUMPS("\nFile Name:\t");
+  DUMP(getFilename());
+  DUMPS("\nFile format:\t");
+  DUMP(getFormat());
+  DUMPS("\nTracks:\t\t");
+  DUMP(getTrackCount());
+  DUMPS("\nTime division:\t");
+  DUMP(getTicksPerQuarterNote());
+  DUMPS("\nTempo:\t\t");
+  DUMP(getTempo());
+  DUMPS("\nMicrosec/tick:\t");
+  DUMP(getMicrosecondDelta());
+  DUMPS("\nTime Signature:\t");
+  DUMP(getTimeSignature()>>8);
+  DUMP('/');
+  DUMP(getTimeSignature()&0xf);
+  DUMP('\n');
+ 
+#if DUMP_DATA
+  for (uint8_t i=0; i<_trackCount; i++)
+  {
+	  _track[i].dump();
+	  DUMP('\n');
+  } 
 #endif // DUMP_DATA
+}
 

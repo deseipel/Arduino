@@ -129,13 +129,10 @@ bpm = mf->getTempo();
 	//elapsedTicks = ((tickCount * (60000000/(24 * bpm))) / (60000000/(24 * bpm)) );  //no worky.
 	elapsedTicks = _elapsedTimeTotal / (60000000L/(96 * bpm));  //original part of the library code.  This ultimately uses elapsed time and divides it by 
 	//                                                            the length of one tick.//
-
+	
 	deltaT = readVarLen(&mf->_fd);   //this calls the readVarLen in the MIDIHelper.cpp file.
-	
-	//mf->setDelta(deltaT);
-	
-	 	total_deltas = ( mf->getDelta() +  deltaT  )  ; // add the old delta time to the new one.
-	//need to code a way to keep a running total of the deltas	
+	total_deltas = ( mf->getDelta() +  deltaT  )  ; // add the old delta time to the new one.
+	//need to code a way to keep a running total of the deltas	?
 	
 	//  if (elapsedTicks < deltaT)  //part of the original code, comparing elapsed ticks and the read delta.
 	//	return(false);  
@@ -144,8 +141,9 @@ bpm = mf->getTempo();
 		if (tickCount < total_deltas)  //
 		{
 		total_deltas=(mf->getDelta());
+		mf->setDelta(mf->getDelta());
 		return (false);
-		//total_deltas=(mf->getDelta());
+		
 		}
 		
 	

@@ -1,0 +1,7 @@
+
+
+
+void clearFilelist(){
+  tft.drawRect(0, 60, 128, 100, ST7735_BLACK);
+  tft.fillRect(0, 60 , 128, 100, ST7735_BLACK); 
+}

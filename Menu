@@ -1,0 +1,578 @@
+
+
+void drawFilelist(int listStart){     ///this function lists the MIDI file names, called from the "select MIDI" menu
+  clearFilelist();
+
+  // sprintf(msg, "drawFileList\nlistStart: %d\n filePOS: %d\n fileIndex: %d\n", listStart,  filePOS, fileIndex);
+  // Serial.print(msg);
+  tft.setCursor(0,60);
+  int maxfile = maxmidicount;    //topfile(filePOS, listStart, fileIndex);
+  // Serial.println(maxfile);
+  //for(fileIndex = listStart; fileIndex < (listStart+10); fileIndex++){
+
+  //if the filePOS < listStart, fix it.
+  //test case:  
+  /* 
+   reset, then select the 3rd song in the file list with joystick, trigger up 3 times, then go back to the midi file list.  it will start at song 3 but won't show the selected song #1 at all.
+   
+   */
+
+  //if(filePOS<listStart)listStart=(filePOS); //   just set liststart = filePOS 
+
+  for(fileIndex = listStart; fileIndex < (listStart+10); fileIndex++){   ///works well
+    if (fileIndex == filePOS) {
+      tft.setTextColor(ST7735_GREEN);
+    }
+    else
+    {
+      tft.setTextColor(ST7735_WHITE);
+    }
+    int file2Screen = (fileIndex)%maxfile;  // % means if we go past maxfile it just wraps back to "0"
+
+
+    if (file2Screen!=0){
+      tft.print(file2Screen);
+      tft.print(" ");
+      tft.println(nameFiles[file2Screen]);
+    }
+  }
+  // sprintf(msg, "Postdraw\n listStart: %d\n filePOS: %d\n fileIndex: %d\n  maxfile %d\n", listStart,  filePOS, fileIndex, maxfile);
+  //Serial.print(msg);
+}
+
+
+
+
+struct MENUITEM {               //this defines each menu ITEM
+  char label[MAX_PROMPT_LEN];
+  int datatype;
+  void* ptrGlobal;
+  int min;
+  int max;
+  char** ptrGlobalLabels;
+}  
+;
+//MIDI Clock menu code, currently doesn't affect functionality at all
+int 	_clockID = 0;
+int* 	_clockPtr = &_clockID;
+enum    _clockIDs { 
+  INTCLOCK, EXTCLOCK };
+
+//MIDI mapping menu code, currently not used.
+int _mapperID=0;
+int* _mapperPtr = &_mapperID;
+enum _mapperIDs {
+  ON, OFF};
+
+//more menu setup for the MIDI clock & MiDI mapper menus
+static char *_mapperLabels[] = {
+  "ON", "OFF"};
+static char *_clockLabels[] = { 
+  "INT","EXT" };
+enum _menuitems { 
+  CLOCK_SWITCH, MAPPER_SWITCH, TEMPO_SWITCH };
+enum _menuDataTypes { 
+  INT, FLOAT, OPTION };
+
+static MENUITEM _mi_list[] ={// type, ptrGlobal, Min,    Max,    			ptrGlobalLabels
+  { 
+    "MIDI CLOCK:", 		OPTION,	_clockPtr,	0,	 (sizeof(_clockIDs)-1), _clockLabels                  }
+  ,
+  { 
+    "MIDI MAPPER:", OPTION, 	_mapperPtr, 0, (sizeof(_mapperIDs)-1), _mapperLabels                 } 
+};
+
+
+static uint16_t menu_color = ST7735_WHITE;
+
+
+
+struct SELECTION {
+  char label[MAX_PROMPT_LEN];
+  void(*function) ( int );
+  int fn_arg;
+}  
+;
+
+struct MENU {
+  int id;
+  char label[MAX_PROMPT_LEN];
+  int num_selections;
+  SELECTION selection[MAX_SELECTIONS];
+} 
+;
+
+
+//  enumerated menu ids must be in order of static MENU menu[], as they are same as array's index
+//enum _menus { MAIN_MENU, DEPWD_MENU, BALANCE_MENU };
+enum _menus{ 
+  MAIN_MENU, FILE_LIST, MAPPINGS, SETTINGS};  // 2/24/14
+
+
+enum _menu_keys { 
+  ADD, EDIT };
+
+static MENU menu[] = {
+  { 
+    MAIN_MENU, "Main Menu", 4, {
+      {
+        "MIDI Files", goto_menu, FILE_LIST                                                }
+      ,  
+      {
+        "Mappings", goto_menu, MAPPINGS                                                }
+      ,
+      {
+        "Settings", goto_menu, SETTINGS                                                }
+      ,
+      {
+        "Hide Menu", menu_hide, 0                                                } 
+    }
+  }
+  ,
+  { 
+    FILE_LIST, "MIDI Files", 2, {
+      {
+        "Select a File", select_midi, 0                                                }
+      ,  
+
+      {
+        "Go Back", goto_menu, MAIN_MENU                                                } 
+    }
+  }
+  ,
+  { 
+    MAPPINGS, "MIDI Mappings Menu", 4, {
+      {
+        "Add New Mapping", add_mapping, ADD                                                }
+      ,
+      {
+        "Edit Mapping", edit_mapping, EDIT                                                }
+      ,
+      {
+        "Delete Mapping", delete_mapping, MAIN_MENU                                                }
+      ,
+      {
+        "Go Back", goto_menu, MAIN_MENU                                                } 
+    }
+  }
+  ,
+  { 
+    SETTINGS, "Settings", 4, {
+      {
+        "Map Events On/Off", mapping_onoff, static_cast<int>(MAPPER_SWITCH)                                                }
+      ,
+      {
+        "Clock INT/EXT", clock_intext, static_cast<int>(CLOCK_SWITCH)                                                }
+      ,
+      {
+        "Tempo", set_tempo, 0                                                }
+      ,
+      {
+        "Go Back", goto_menu, MAIN_MENU                                                } 
+    }
+  }
+};
+
+MENU * curr_menu = menu;
+int menu_enable = 0;
+//  curr_selection is the SELECTION array index of the curr_menu
+int curr_selection = 0;
+void menu_hide( int ){ 
+  menu_enable = 0; 
+  cls; 
+  draw_menu(); 
+}
+
+//this is the function that sets the tempo for the MIDI clock & MIDI player.
+void set_tempo(int key){
+
+  cls();   //clears the screen
+  tft.setTextColor(ST7735_WHITE);
+  sprintf( textx, "\n\n\n\n\nPress %c to exit\nUse %c & %c to adjust\n", larr, uarr, darr );
+  tft.print( textx );
+
+
+  for( uint8_t b = CheckJoystick(); b != Left; b = CheckJoystick() ) {   //this basically checks the joystick and as long as left isn't detected, it sets the tempo up or down.
+    tft.setTextSize(2);
+    // tft.setCursor(10, 1);
+    tft.drawRect(80, 1, 40, 16, ST7735_BLACK);
+    tft.fillRect(80, 1 , 40, 16, ST7735_BLACK);
+    String TempoString = "Tempo: "; 
+
+    String String3;  // a string so I can concat tempo char and tempo bpm
+    String3 = TempoString + bpm; 
+    tft.setCursor(1, 3);
+    //sprintf( textx, String3 );
+    tft.println(String3);
+
+
+    if( b == Up  )
+      bpm++;
+    else if( b == Down )
+      bpm--;
+
+    if( b ) // control repeat speed
+      delay(125);
+  }
+  SMF.setTempo(bpm);   //calls the library code to set the tempo for the MIDI player, MIDI clock also uses the bpm variable.
+  tft.setTextSize(1);
+  //tft.setTextColor( colorsave );
+  cls();
+  draw_menu();   //draws the menu to refresh
+
+}
+
+//for all this code, all it really does right now is to switch between ON & OFF, no real functionality yet.
+void mapping_onoff(int item){
+  cls();
+  tft.setTextColor(ST7735_WHITE);
+  sprintf( textx, "\n\n\n\n\nPress %c to exit\nUse %c & %c to adjust\n", larr, uarr, darr );
+  tft.print( textx );
+  int _x = 1;
+  int _y = 3;
+  for( uint8_t b = CheckJoystick(); b != Left; b = CheckJoystick() ) {
+    void* tempNum;
+    int *tempI;
+    tft.setCursor(_x,_y);
+    sprintf( textx,  "%s:\n", _mi_list[item].label );
+    tft.print(textx);
+    tft.setTextSize(2);
+
+    if( _mi_list[item].datatype == OPTION || _mi_list[item].datatype == INT ) {
+      tempI =  reinterpret_cast<int *>(_mi_list[item].ptrGlobal);
+      if( b == Up  )
+        *tempI += 1;
+      else if( b == Down )
+        *tempI -= 1;
+      //  ints can implement wrap... might confuse but oh well...
+      if( *tempI < _mi_list[item].min ) *tempI = _mi_list[item].max;
+      if( *tempI > _mi_list[item].max ) *tempI = _mi_list[item].min;
+    }
+    if( _mi_list[item].datatype == OPTION )
+      sprintf( textx, "%-12.12s\n", _mi_list[item].ptrGlobalLabels[*tempI] );
+    if( _mi_list[item].datatype == INT )
+      sprintf( textx, "%d\n", *tempI );
+    tft.setCursor(0,20);
+    tft.drawRect(0, 20, 35, 16, ST7735_BLACK);
+    tft.fillRect(0, 20 , 35, 16, ST7735_BLACK);
+    tft.print(textx);  //prints the ON or OFF
+    tft.setTextSize(1);
+    if( _mi_list[item].datatype == OPTION ) {
+      sprintf( textx, "\n\noption index = %d, max = %d\n", *tempI, _mi_list[item].max );
+      tft.setCursor(0,60);
+      tft.print(textx);
+    }
+    if( b ) // control repeat speed
+      delay(125);
+  }
+  //tft.setTextColor( colorsave );
+  cls();
+  draw_menu();
+
+
+  //////////////////////////////////////////////////////////////////////////////////////////////////
+}
+
+void clock_intext (int key){
+  tft.setCursor(0,60);
+  tft.println("set the midi clock to int or ext");
+
+}
+
+//  this is the function that is called when selecting a MIDI file.
+
+void select_midi(int key){
+
+  tft.setCursor(0,60);
+  if (listStart==0) listStart=1;
+
+  drawFilelist(listStart);
+
+  for( uint8_t b = CheckJoystick(); b != Left   ; b = CheckJoystick() ) {
+    if (b == Down){
+      // filePOS = (filePOS++)%maxmidicount;  //wraps back to 0 if  = maximidicount
+      filePOS = (filePOS+maxmidicount+1)%maxmidicount;
+      if (filePOS==0)filePOS=1;
+      listStart = filePOS;  
+      setNextSong();
+      drawFilelist(listStart);
+      // sprintf(msg, "listStart: %d\n filePOS: %d\n fileIndex: %d\n", listStart,  filePOS, fileIndex);
+      //  Serial.print(msg);
+      //sychronize the MIDI file with the program change,  all these Changecontrols are necessary for the KORG ES1 for some reason.
+      sendChangeControl(99,05,10);
+      sendChangeControl(98,107,10);
+      sendChangeControl(06,0,10);
+      sendChangeControl(99,05,10);
+      sendChangeControl(98,108,10);
+      sendChangeControl(06,0,10);
+
+      P=filePOS-1;
+      sendProgramChange(P,10);
+      //  P=filePOS;
+    }
+    //////////////////////////
+    else  if (b==Up){
+
+      filePOS = (filePOS+maxmidicount-1)%maxmidicount;  //wraps back to maximidicount if <0
+      if (filePOS==0)filePOS=maxmidicount-1;
+      setNextSong();
+      listStart = filePOS;      
+      drawFilelist(listStart);
+
+      // sprintf(msg, "listStart: %d\n filePOS: %d\n fileIndex: %d\n", listStart,  filePOS, fileIndex);
+      // Serial.print(msg);
+
+      //try to sync the Program changes with MIDI filesj
+      sendChangeControl(99,05,10);
+      sendChangeControl(98,107,10);
+      sendChangeControl(06,0,10);
+      sendChangeControl(99,05,10);
+      sendChangeControl(98,108,10);
+      sendChangeControl(06,0,10);
+      P=filePOS-1;
+      sendProgramChange(P,10);
+      //  P=filePOS;
+    }
+    
+   
+    
+    
+    //
+    if( b ) // control repeat speed
+      delay(125);
+  }
+  cls();
+  draw_menu();
+}
+
+//this prints all the files names, but I only want 10 at a time, for all files (scrollable list).
+
+//}
+
+//the next three functions do nothing as of yet...
+void add_mapping(int key){
+  tft.setCursor(0,60);
+  // sprintf(text,  "%s %d\n\nOMG you're RICH!", __FUNCTION__, key );
+  tft.println("add a midi mapping");
+}
+
+void edit_mapping(int key){
+  tft.setCursor(0,60);
+  tft.println("select a mapping to edit"); 
+}
+
+void delete_mapping(int key){
+  tft.setCursor(0,60);
+  tft.println("select a mapping to delete");
+}
+
+
+// Set & display active menu
+void goto_menu ( ) {
+  //  a_menu is working copy of curr_menu, which will get reset to our parent
+  static MENU *a_menu = curr_menu;
+  //	Create a selection pointer for convenience
+  //  the LAST selection in a menu must be to "go up" a menu
+  static SELECTION *selptr = &a_menu->selection[ curr_selection ];
+  curr_menu = &menu[selptr->fn_arg ];
+  curr_selection=0;
+  cls();
+  draw_menu();
+  return;
+}
+
+void goto_menu ( int newmenu ) {
+  curr_menu = &menu[newmenu];
+  curr_selection=0;
+  cls();
+  draw_menu();
+  return;
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+bool doMenu( void ){
+  //uint8_t b = checkJoystick();
+
+  uint8_t b = CheckJoystick();
+  if( b == Neutral ){
+    return false;   //  user input didn't happen
+  }
+
+  //  enable menu if up, else ignore input & return  ---------------------------------------
+  if( ! menu_enable ) {
+    if( b == Up ) {
+      menu_enable = 1;
+      curr_selection = 0;   //  start with top item as selected
+      cls();
+      draw_menu();
+    }
+    return 0;
+  }
+
+  //-----------------------------------------------------------------------------------------
+  SELECTION *selptr = &curr_menu->selection[ curr_selection ];
+  tft.setCursor(0,10);
+  // const char* Buttons[]={"Neutral", "Press", "Up", "Down", "Right", "Left" };
+  if( b == Up ) {
+    if(curr_selection > 0)
+      curr_selection--;
+    else    //  wrap around
+    curr_selection = curr_menu->num_selections-1;
+  } 
+  else if( b == Down ) {
+    if(curr_selection < curr_menu->num_selections-1 )
+      curr_selection++;
+    else
+      curr_selection=0;
+  } 
+  else if( b == Left ) {    //  back out to higher menu
+    menu_parent();
+  } 
+  else if( b == Right || b == Press ) {
+    // curr_menu->selection[curr_selection].function();
+    selptr->function( selptr->fn_arg );
+  }
+  if( b == Up || b == Down )
+    draw_menu( );
+  return true;    //  user input happened
+}
+////////////////////////////////////////////////////////////////////////////////
+//  Finds parent of current menu and resets curr_menu to it and draws menu
+void menu_parent( ){
+  curr_selection=0;
+  //  already at top of menu, so hide it. &menu[0] used as is more obvious than just 'menu'
+  if( curr_menu == &menu[0] && menu_enable ) {
+    menu_enable = false;
+  } 
+  else {
+    //  a_menu is working copy of curr_menu, which will get reset to our parent
+    MENU *a_menu = curr_menu;
+    //	Create a selection pointer for convenience
+    //  the LAST selection in a menu must be to "go up" a menu
+    static int num_menus=sizeof(_menus);
+    SELECTION *selptr = &a_menu->selection[ a_menu->num_selections - 1 ];
+    for( int menuidx = 0; menuidx < num_menus ; menuidx++ ) {
+      if( selptr->fn_arg == menu[menuidx].id ) {
+        curr_menu=&menu[menuidx];
+        curr_selection=0;
+        break;
+      }
+    }
+  }
+  cls();
+  draw_menu();
+}
+
+//  displays the currently selected menu (or uarr for menu if not enabled)
+void draw_menu( ){
+  String TempoString = "Tempo: "; 
+  //String BarString = "Bar: ";
+  String String3;  // a string so I can concat tempo char and tempo bpm
+  String3 = TempoString + bpm; 
+track_cnt = SMF.getTrackCount();
+
+  if( ! menu_enable ) {
+    cls();
+
+    tft.setTextColor(ST7735_WHITE);
+    sprintf( textx, "%c for menu", uarr );
+    tft.print( textx );
+
+    tft.setCursor(1, 20);
+    tft.setTextColor(ST7735_GREEN);
+    tft.print("File: ");
+    // tft.println(nameFiles[filePOS]);
+    tft.print(current_song);
+
+    tft.setCursor(1,30);
+    tft.setTextColor(ST7735_YELLOW);    
+    tft.print("Next: ");
+    tft.print(next_song);
+
+    tft.setCursor(1,50);
+    tft.setTextColor(ST7735_RED);
+    tft.setTextSize(2);
+    tft.println(String3);
+    
+        tft.setCursor(10, 70);
+    tft.print("Tracks: ");
+    tft.println(int(track_cnt));
+
+    //testing
+    /*    tft.setTextSize(1);
+     tft.setCursor(1,80);
+     tft.setTextColor(ST7735_WHITE);
+     tft.print("ListStart ");
+     tft.println(listStart);
+     tft.print("fileIndex ");
+     tft.println(fileIndex);
+     tft.print("filePOS ");
+     tft.println(filePOS);
+     */
+
+
+    tft.setTextSize(1);
+    //guiFooter();
+    return;
+
+  }
+  //	//uint16_t colorsave = tft.getTextColor();
+  tft.setTextColor( menu_color );
+  tft.setCursor(0, 2);
+  //Serial.println(freeMemory());
+  //	//  magic number alert! set %-20.20s to same value as MAX_PROMPT_LEN
+
+  sprintf( textx, "%-20.20s\n", curr_menu->label );
+  tft.print(textx);
+  int selection_num = 0;
+  //	// Loop through the actual number of selections in THIS menu
+  for(selection_num=0; selection_num < curr_menu->num_selections; selection_num++)
+  {
+    //		// Create a pointer for convenience
+    SELECTION *selptr = &curr_menu->selection[selection_num];
+    //		//	If this is the "active" menu selection (determine by referencing the global
+    //		//	variable 'curr_selection' then draw it in inverse text.
+    if (selection_num == curr_selection)
+      tft.setTextColor(ST7735_BLUE);
+    //		// Print the prompt string
+    //tft.setCursor(selection_num + MENU_INDENT_Y, MENU_INDENT_X);
+    sprintf( textx, "  %-20.20s\n", selptr->label );
+    tft.print(textx);
+    //		// Turn inverse back off if need be
+    if (selection_num == curr_selection)
+      tft.setTextColor(ST7735_RED);
+  }
+
+  tft.setTextColor( ST7735_WHITE );
+
+}
+
+
+
+void setCurrentSong(){   //this sets the current_song variable to whatever is the song is the filePOS.
+  char Str1[20];
+
+  for (int i = 0; i<20; i++){  
+
+    Str1[i] = nameFiles[filePOS][i];
+  }
+  current_song = Str1;
+}
+
+void setNextSong(){
+  char Str2[20];
+
+  for (int i = 0; i<20; i++){  
+
+    Str2[i] =nameFiles[filePOS ][i];
+  }
+  next_song = Str2;
+}
+
+//  clearscreen helper for tft
+void cls() {
+  tft.fillScreen(ST7735_BLACK);
+  tft.setCursor(0, 2);
+}
+

@@ -20,6 +20,8 @@
 
 
 // Edit for Shield Pinouts!
+#define sclk 52
+#define mosi 51   
 #define SD_CS    4  // Chip select line for SD card
 #define TFT_CS  10  // Chip select line for TFT display
 #define TFT_DC   8  // Data/command line for TFT
@@ -30,7 +32,7 @@ Adafruit_ST7735 tft = Adafruit_ST7735(TFT_CS, TFT_DC, TFT_RST);
 MIDIFile SMF;  
 //MFTrack MF;
 SdFat	SD;
-MIDIFile SMF2;
+//MIDIFile SMF2;
 #define	BEAT_LED		13
 
 
@@ -199,11 +201,11 @@ void setup(){
 void loop() {
   CheckMIDI();
   if( doMenu() ){
-
-    //		//  something happened with joystick, an update() action could be called here
+//
+//    //		//  something happened with joystick, an update() action could be called here
   }
   
-  if((S==1) && (midiClockRunning ==1) ){
+  if ((S==1) && (midiClockRunning ==1) ){
   Playit();
   }
 }

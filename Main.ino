@@ -68,7 +68,8 @@ uint8_t track_cnt;
 //SoftwareSerial SSerial(2, 3); // RX, TX
 
 // Midi Clock  //
-#define PPQ 96 // Min BPM = 50 //
+int  PPQ = 96; // Min BPM = 50 //
+uint8_t DIV = (PPQ/24);
 volatile uint8_t  sync24PPQ = 0;
 long bpm = 100;
 long interval = (6000000/(24 * bpm));  

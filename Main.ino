@@ -5,7 +5,7 @@
  To Do:
 
 2.   account for differnt PPQ?
-3.  track count is only right after stopping playback?
+3.  large files don't appear to play after a while (IPANEMA.MID)
 
  
  */
@@ -68,7 +68,7 @@ uint8_t track_cnt;
 //SoftwareSerial SSerial(2, 3); // RX, TX
 
 // Midi Clock  //
-#define PPQ 96 // Min BPM = 50 //
+#define PPQ  96 // Min BPM = 50 //
 volatile uint8_t  sync24PPQ = 0;
 long bpm = 100;
 long interval = (6000000/(24 * bpm));  
@@ -79,6 +79,7 @@ uint8_t midiClockType = 2; // 0=Internal Only (no Sync), 1=SyncToExternal (Slave
 volatile byte tick;
 volatile long long tick_count= 0 ;
 byte started =0;
+ byte startsetup = 1; 
 
 
 byte oldP = 1;  // a byte to compare to the new Program/patch number //
@@ -201,12 +202,16 @@ void setup(){
 void loop() {
   CheckMIDI();
   if( doMenu() ){
-//
-//    //		//  something happened with joystick, an update() action could be called here
+
+    //		//  something happened with joystick, an update() action could be called here
   }
   
-  if ((S==1) && (midiClockRunning ==1) ){
-  Playit();
-  }
+//  if ((midiClockRunning==0) && (midiClockType==2) && (S==0)) {  //starts the clock when nothing is actually playing//
+//    MidiClockStart(true, true);
+//    midiClockRunning =1;
+//  }
+ // if((S==1) && (midiClockRunning ==1) ){
+  //Playit();
+  //}
 }
 

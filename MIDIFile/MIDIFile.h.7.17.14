@@ -140,13 +140,17 @@ class MFTrack
 	uint32_t	getLength(void);		// get length of track in bytes
 	bool		getEndOfTrack(void);	// get end of track status (true = EOT)
 
+	
+
 	// Data handling
 	void	syncTime(void);				// reset the start time for this track
 	void	restart(void);				// reset the track to the start of data in the file
 	int		load(uint8_t trackId, MIDIFile *mf);// load the definition for a track
+	
 	void	close(void);						// close a track
 	bool	getNextEvent(MIDIFile *mf, uint32_t elapsedTime);	// get and process the events that need to be processed
-	bool 	PlayTracks(MIDIFile *mf, uint32_t elapsedTime);  //removes the timing of this library and just processes the track.
+	bool 	PlayTracks(MIDIFile *mf);
+//	bool 	PlayTracks(MIDIFile *mf, uint32_t elapsedTime);  //removes the timing of this library and just processes the track.
 //		void 		setTTick(byte tick);
 //	byte 		getTTick();
 /*     unsigned long 	getTickCount();              //passes in the current count of ticks that have elapsed.
@@ -169,6 +173,8 @@ class MFTrack
 	uint32_t	_currOffset;	// offset from start of the track for the next read of SD data
 	bool		_endOfTrack;	// true when we have reached end of track or we have encountered an undefined event
 	uint32_t	_elapsedTimeTotal;	// the total time elapsed in microseconds since events were checked
+	long long   _elapsedTicks;    // the total ticks elapsed for the track
+	long long   _total_deltas;       //the new total delta for the track
 	midi_event  _mev;			// data for MIDI callback function - persists between calls for run-on messages
 		  unsigned long _etime; 
 };
@@ -197,19 +203,26 @@ class MIDIFile
 	unsigned long    getLastTime(); 
 	void    setLastTime(unsigned long etime);
 	void    setDelta(uint32_t delta);
+	void 	resetDelta(uint32_t ddelta);
 	uint32_t getDelta(void);
 	long long 	getTickCount();              //passes in the current count of ticks that have elapsed.
 	void    setTickCount(long long Tcount);
+	uint32_t getTrackFirstDelta(void);  
+	void 	 setTrackFirstDelta(uint32_t tfd);  
+	void 	 setDcount(uint32_t dcnt);
+	uint32_t getDcount(void);   // a counter for debugging.
 
 
 
     // MIDI file name
     void      setFilename(const char* aname);
     const char* getFilename(void);
+		byte 		getTrackNo(void);       //gets the current trackid.
     
     // MIDI file header data
     uint8_t   getFormat(void);
     uint8_t   getTrackCount(void);
+	
 
 	// Playback control
 	void	  pause(bool bMode);	// start pause when true and restart when false
@@ -248,6 +261,11 @@ class MIDIFile
 
     uint8_t   _format;              // file format - 0: single track, 1: multiple track, 2: multiple song
     uint8_t   _trackCount;          // # of tracks in file
+	unsigned long 	total_track_deltas;   // per track deltas
+	uint32_t _tfd;  //total track deltas
+	bool firstdelta;  //
+	long long backupcount;  
+	long long dcount;  // used to count how many tracks the code is cycling through.
  
 	// The MIDI header chunk contains a 16-bit value that gives the number of ticks per quarter note. 
 	// (Ticks are the units measured by the delta-time values). This value is a constant over the 
@@ -270,6 +288,7 @@ class MIDIFile
 	byte 	_tick;					//holds if a tick is active.
 unsigned long _etime; 
 unsigned long _delta; 
+unsigned long _ddelta;
 	// Notes come in different power-of-two lengths. A quarter note normally is one beat long 
 	// (although this isn't always the case). A half note is two beats, and a whole note is 
 	// four beats. (It's called a whole note because it takes up a whole measure, if you're in 4.)

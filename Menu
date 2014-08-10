@@ -205,18 +205,14 @@ void set_tempo(int key){
     //sprintf( textx, String3 );
     tft.println(String3);
 
- if (b==Neutral){     //this works but its an ugly solution.
-     if ((S==1) && (midiClockRunning ==1) ){
-  Playit();
-  }}
 
     if( b == Up  )
       bpm++;
     else if( b == Down )
       bpm--;
 
-    if( b ) // control repeat speed
-      delay(125);
+ //   if( b ) // control repeat speed
+   //   delay(125);
   }
   SMF.setTempo(bpm);   //calls the library code to set the tempo for the MIDI player, MIDI clock also uses the bpm variable.
   tft.setTextSize(1);
@@ -241,15 +237,9 @@ void mapping_onoff(int item){
     sprintf( textx,  "%s:\n", _mi_list[item].label );
     tft.print(textx);
     tft.setTextSize(2);
-    //
-     if (b==Neutral){                                                                 //this works but its an ugly solution.
-     if ((S==1) && (midiClockRunning ==1) ){
-  Playit();
-  }}
-//
+
     if( _mi_list[item].datatype == OPTION || _mi_list[item].datatype == INT ) {
       tempI =  reinterpret_cast<int *>(_mi_list[item].ptrGlobal);
-      
       if( b == Up  )
         *tempI += 1;
       else if( b == Down )
@@ -272,8 +262,8 @@ void mapping_onoff(int item){
       tft.setCursor(0,60);
       tft.print(textx);
     }
-    if( b ) // control repeat speed
-      delay(125);
+ //   if( b ) // control repeat speed
+   //   delay(125);
   }
   //tft.setTextColor( colorsave );
   cls();
@@ -299,15 +289,7 @@ void select_midi(int key){
   drawFilelist(listStart);
 
   for( uint8_t b = CheckJoystick(); b != Left   ; b = CheckJoystick() ) {
-   
- //  uint8_t b = CheckJoystick();
- if (b==Neutral){     //this works but its an ugly solution.
-     if ((S==1) && (midiClockRunning ==1) ){
-  Playit();
-  }
- }
-   
-  else  if (b == Down){
+    if (b == Down){
       // filePOS = (filePOS++)%maxmidicount;  //wraps back to 0 if  = maximidicount
       filePOS = (filePOS+maxmidicount+1)%maxmidicount;
       if (filePOS==0)filePOS=1;
@@ -351,15 +333,13 @@ void select_midi(int key){
       sendProgramChange(P,10);
       //  P=filePOS;
     }   
- 
+    
     //
-    if( b ) // control repeat speed
-      delay(125);
-  }  // end for loop
+  //  if( b ) // control repeat speed
+    //  delay(125);
+  }
   cls();
   draw_menu();
- 
-  
 }
 
 //this prints all the files names, but I only want 10 at a time, for all files (scrollable list).

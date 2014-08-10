@@ -52,56 +52,36 @@ void midiTimer()
   {
     if ((sync24PPQ == (0)) && (S==1)  ){    //  ok, so since I'm using 96 ppq and I need to send clock every 4th time, the sync24ppq variable accomplishes that.  I also call the Play code here
       // Serial.write(0xF8); // Midi Clock Sync Tick (96 PPQ)
-      SMF.setTick(1); //this just lets me tell the library that a clock tick is active.
-
+     // SMF.setTick(1); //this just lets me tell the library that a clock tick is active.
       // Play();
       Serial.write(0xF8); // Midi Clock Sync Tick (96 PPQ)
       // tick_count = SMF.getTickCount();
-    }
-    //    else 
-    //    {
-    ////      // else if ( (S==1) && ((sync24PPQ < (PPQ/24 ) )))  //doesn't work well, causes notes to run together at loop.
-    //      if (  (S==1) && (sync24PPQ == (1||2||3)))  // do not change this, it affects the looping ability
-    //     {
-    //        SMF.setTick(0);
-    //        Play(); 
-    //////      //   tick_count = SMF.getTickCount();
-    //     }      
-    //    }
+    }   
     sync24PPQ++;
     //    SMF.getTickCount();
     tick_count++; //COUNT THE TICKS SO YOU CAN CALCULATE HOW MUCH TIME HAS PASSED SO YOU CAN PLAY IN TIME IN THE MFTRACK CODE.
     SMF.setTickCount(tick_count);
-
+ Playit(); 
     if (sync24PPQ >= (4)) {
-
-
-      sync24PPQ = 0;    
-      //Play();    //DO NOT PLAY HERE, ALREADY PLAYS ON 0,1,2,3.  THIS IS RIGHT.
-      //       tft.drawRect(10, 80, 128, 5, ST7735_BLACK);
-      //    tft.fillRect(10, 80 , 128, 5, ST7735_BLACK); 
-      //    tft.setTextColor(ST7735_BLUE);
-      //  //  tft.setTextSize(1);
-      //    tft.setCursor(10, 80);
-      //    tft.print(int(tick_count));
-
+      sync24PPQ = 0;       
     }
+   
   }
- 
+
 }
 
 void CloseOut(){
   SMF.close(); 
   if (Play_setup())  //this is the code that handles the looping of the midi files
-  {          
-  } 
+ {          
+ } 
 }
 
 void Playit(){  
   // this is called at a rate of 24PPQ from the timer.  Probably don't need the S=1 if statement.  
-  SMF.setLastTime(micros()); // might not need this and I don't like using micros for timing, unreliable.
-  SMF.setTickCount(tick_count); 
-  tick_count=SMF.getTickCount();  
+ // SMF.setLastTime(micros()); // might not need this and I don't like using micros for timing, unreliable.
+ // SMF.setTickCount(tick_count); 
+ // tick_count=SMF.getTickCount();  
 
   // while(!SMF.isEOF() ) {
   if(!SMF.isEOF()){
@@ -111,8 +91,6 @@ void Playit(){
   }  
   else
   {
-    if (SMF.isEOF())
-    {  
       tick_count = SMF.getTickCount();  
       float fbars = ceil(tick_count/(384.00));   //this returns the rounded up number of bars.  384 is the number of ticks in one bar of 4/4 (assumes 96 PPQ and 4/4 time).  
       //384 = 1 bar, 1536 = 4 bars, 3072 = 8 bars, 4608 = 12 bars.  
@@ -126,15 +104,8 @@ void Playit(){
       sync24PPQ = 0; 
       //  MidiClockStop();
       //    SMF.close();   
-    }
-    //  if (started ==0)  //checks to see if MIDI clock has started, might be not needed.
-    //  {
-    //    Serial.write(0xFA);  //MIDI Start event, does this once.
-    //    started=1; 
-    //  }
-    //
-    //
-    //if (SMF.getTick()==1) Serial.write(0xF8); // Midi Clock Sync Tick (96 PPQ)    
+    
+   
   }
 }
 void FileNameCheck()   //this handles setting up a file to play and also lets me queue up the next file during playback.  Called during Play_setup.
@@ -174,6 +145,7 @@ void FileNameCheck()   //this handles setting up a file to play and also lets me
 
 bool Play_setup(){   
   int  err = -1;
+ int TPQ = 0; 
   // int tpq = SMF.getTicksPerQuarterNote();
 
   FileNameCheck();
@@ -182,13 +154,21 @@ bool Play_setup(){
 
   err = SMF.load();                                              //NEED TO FIND A WAY TO PRELOAD SONGS BETTER.
   SMF.setTempo(  bpm); //should only have to set this once.
-  track_cnt=SMF.getTrackCount();
+//  TPQ  =  SMF.getTicksPerQuarterNote();
+  
+ // if (TPQ != PPQ){
+    
+ // }
+  
+  //PPQ = TPQ;
+  //  track_cnt=SMF.getTrackCount();
   // PPQ = tpq;   //may not work correctly when looping...
   //  SMF.setTicksPerQuarterNote(PPQ);
   //  
   if (err != -1)
   {
-    tft.setCursor(5, 120);
+    tft.setCursor(5, 80);
+    tft.println(SMF.getFilename());
     tft.print("MIDI File Load Error" );
     tft.println(err);
     return (false);
@@ -213,29 +193,22 @@ void MidiClockStart(uint8_t restart, uint8_t callMidiTimer)    //  usage is Midi
   {
     // midiClockProcess = 1;
     sync24PPQ = 0;
+    tick_count=0;
+    SMF.setTickCount(tick_count);
     // midiClockCounter  = 0;
   }
   if (midiClockType == 2) Serial.write(0xFA); // MIDI Start
 
-
+if (!Play_setup()     );
   if (midiClockType != 1) timerStart();
   if (callMidiTimer == 1) midiTimer();
 
-  //Play the midi file
-  //need a pre-load routine to load the MIDI file & setup stuff.
-
-  if (!Play_setup()){
-    //////   Playit(); 
-    //////  }
-    //////  else
-    //////{
-    MidiClockStop();
-    SMF.close();
-    S==0;
-  }
-
+//  //Play the midi file
+//  //need a pre-load routine to load the MIDI file & setup stuff.
 
 }
+
+
 
 // ======================================================================================= //
 void MidiClockStop()

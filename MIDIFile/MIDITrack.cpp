@@ -35,8 +35,8 @@ void MFTrack::reset(void)
 	_endOfTrack = false;
 	_elapsedTimeTotal = 0;
 	_trackId = 255;
-	_elapsedTicks =0;
-	_total_deltas =0;
+	//_elapsedTicks =0;
+	_total_deltas =0;      //this has to be set back to zero because the looping code sets the tick count to a negative number.  
 //	_Ttick = 0;
    // _Tcount = 0;
 	//_delta = 0; 
@@ -113,11 +113,12 @@ return _delta;
 
 bool MFTrack::PlayTracks(MIDIFile *mf )
 {
-uint32_t deltaT, elapsedTicks; 
+uint32_t deltaT ;
 
 long long old_delta;
 uint8_t bpm;
 long long  tickCount; 
+
 tickCount = mf->getTickCount();   //this is where I set the tickCount, which is a running total of how many ticks have passed.
 bpm = mf->getTempo();
 old_delta = _total_deltas;
@@ -131,7 +132,7 @@ old_delta = _total_deltas;
 	
 	// work out new total elapsed time
 //	_elapsedTimeTotal += elapsedTime;
-	//elapsedTicks = ((tickCount * (60000000/(24 * bpm))) / (60000000/(24 * bpm)) );  //no worky.
+	_elapsedTicks = tickCount;
 //	elapsedTicks = _elapsedTimeTotal / (60000000L/(96 * bpm));  //original part of the library code.  This ultimately uses elapsed time and divides it by 
 	//                                                            the length of one tick.//
 	
@@ -151,7 +152,8 @@ old_delta = _total_deltas;
 	//  if (elapsedTicks < deltaT)  //part of the original code, comparing elapsed ticks and the read delta.
 	//	return(false);  		
 	
-	if ((tickCount < _total_deltas) || (tickCount < 0))  //
+	if ((tickCount < _total_deltas) || (tickCount < 0))  //wonder if I need to account for negative tick calculation?  if the song 
+	//loops and the tickcount is offset to -96 then I can't just say that the ticks under zero don't count. ?
 	//if(tickCount < deltaT)
 		{
 		_total_deltas=(old_delta);
@@ -159,7 +161,8 @@ old_delta = _total_deltas;
 		return (false);		
 		}	
 		
-	//_elapsedTimeTotal -= (deltaT * (60000000L/(96 * bpm)));
+	//_elapsedTimeTotal -= (deltaT * (60000000L/(96 * bpm)));           //do I need to address this ?
+	//  _total_deltas -= (
 	//mf->setTickCount( total_deltas);  //pretty sure this should never happen
 	
 	//mf->setDelta(_total_deltas);  //do not comment out 7.17.14.des  //this needs to change to a track-based newdelta

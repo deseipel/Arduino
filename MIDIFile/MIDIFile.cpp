@@ -47,8 +47,14 @@ void MIDIFile::initialise(void)
   _Tcount = 0;
   _etime = 0;
   _delta = 0; 
+  _ddelta = 0;
+  _tfd = 0;
+  dcount=0;
+  firstdelta = true;
   setMidiHandler(NULL);
   setSysexHandler(NULL);
+  total_track_deltas = 0;
+  backupcount=0;
 
   // File handling
   setFilename("");
@@ -65,6 +71,7 @@ void MIDIFile::synchTracks(void)
 	for (uint8_t i=0; i<_trackCount; i++)
 		_track[i].syncTime();
 	_lastEventCheckTime = micros();
+	
 }
 
 MIDIFile::MIDIFile(void) 
@@ -97,7 +104,8 @@ void MIDIFile::close()
   setFilename("");
   _fd.close();
   //_Tcount = 0;
-  //_delta = 0;
+  _delta = 0;
+  _ddelta =0;
 }
 
 void MIDIFile::setFilename(const char* aname) 
@@ -119,6 +127,8 @@ uint8_t MIDIFile::getTrackCount(void)
 { 
   return _trackCount;
 }
+
+
 
 uint8_t MIDIFile::getFormat(void) 
 // return the format of the MIDI File.
@@ -208,6 +218,16 @@ bool MIDIFile::isEOF(void)
 	 }
 	 return true;
 }
+void 	 MIDIFile::setDcount(uint32_t dcnt)
+{
+ dcount = dcnt;
+}
+
+uint32_t MIDIFile::getDcount(void)
+{
+return dcount;
+}
+
 
 void MIDIFile::pause(bool bMode)
 // Start pause when true and restart when false
@@ -237,6 +257,11 @@ void MIDIFile::setDelta(uint32_t delta)
 _delta = delta;
 }
 
+void MIDIFile::resetDelta(uint32_t ddelta)
+{  
+  _ddelta=ddelta;
+}
+
 uint32_t MIDIFile::getDelta()
 {
 return _delta;
@@ -256,6 +281,17 @@ long long 	MIDIFile::getTickCount()
 {  
     return _Tcount;
 }
+
+void MIDIFile::setTrackFirstDelta(uint32_t tfd)
+{
+_tfd = tfd;
+}
+
+uint32_t MIDIFile::getTrackFirstDelta(void)
+{
+return _tfd;
+}
+
 
 void MIDIFile::setLastTime(unsigned long etime)
 {
@@ -285,15 +321,15 @@ int bpm = getTempo();
 	}	
 	_tick = getTick();	
 	
-	//elapsedTime = (micros() - _lastEventCheckTime);
-	elapsedTime = (getLastTime() - _lastEventCheckTime);
+	elapsedTime = (micros() - _lastEventCheckTime);
+	//elapsedTime = (getLastTime() - _lastEventCheckTime);
 	//  IF THE TIMER'S FREQUENCY IS SET TO 96PPQ THEN EACH TIME PLAY IS CALLED, IT SHOULD NEVER BE TOO SOON, AND THEREFORE NO REASON TO CHECK IT? 
 	// TURNING THE TICK CHECK OFF.  -- NO, this check appears to improve the loop timing somehow. (tick is on the downbeat probably).
 	//  need to find another way, perhaps.  might end up using the getLastTime() after all.
 	
 	//if (_tick ==0) return false;  //tick is set in the midi timer, during the time when MIDI clock sync is set. 
-if (elapsedTime < (((60 * 1000000L) / bpm)/96))
-		return false;	
+ if (elapsedTime < (((60 * 1000000L) / bpm)/96))
+		return false; 
 	_lastEventCheckTime = micros();	
 //	_lastEventCheckTime= getLastTime();
 	
@@ -302,22 +338,34 @@ if (elapsedTime < (((60 * 1000000L) / bpm)/96))
 	//begin track priority
 #if TRACK_PRIORITY	
 	// process all events from each track first - TRACK PRIORITY
-	for (uint8_t i = 0; i < track_count; i++)
-	{
+	//for (uint8_t i = 0; i < track_count; i++)
+	for (uint8_t i =0; i < track_count; i++)
+	{    
+	
+		//if ( dcount<track_count)dcount++;
+		//firstdelta=true;
+		
 		//if (_format != 0) DUMPX(i);
 		// Limit n to be a sensible number of events in the loop counter
 		// When there are no more events, just break out
 		// Other than the first event, the other have an elapsed time of 0 (ie occur simultaneously)
-		for (n=0; n < 200; n++)
+		for (n=0; n < 100; n++)
 		{
-			//if (!_track[i].getNextEvent(this, (n==0 ? elapsedTime : 0)))
-			if (!_track[i].PlayTracks(this, (n==0 ? elapsedTime : 0)));
+		//if ( dcount < n )dcount++;
+			if (!_track[i].PlayTracks(this))
+		//	if (!_track[i].PlayTracks(this, (n==0 ? elapsedTime : 0)));     //
 			
 				break;
 			
 		}
-		
-    }
+			/* setDelta(getTrackFirstDelta());
+		setTickCount(backupcount);
+		firstdelta =false; */
+		//close();
+    }   
+
+	//setDcount(dcount);
+	
 //setTickCount(0); 
 
 #else // EVENT_PRIORITY
@@ -325,7 +373,7 @@ if (elapsedTime < (((60 * 1000000L) / bpm)/96))
 	bool doneEvents1;
 
 	// Limit n to be a sensible number of events in the loop counter
-	for (n = 0; (n < 200) && (!doneEvents1); n++)
+	for (n = 0; (n < 100) && (!doneEvents1); n++)
 	{
 		doneEvents1 = false;
 
@@ -335,10 +383,10 @@ if (elapsedTime < (((60 * 1000000L) / bpm)/96))
 
 			if (_format != 0) DUMPX(i);
 			// Other than the first event, the other have an elapsed time of 0 (ie occur simultaneously)
-			bb = _track[i].PlayTracks(this, (n==0 ? elapsedTime : 0));
-			if ((bb) && (_format != 0)) DUMPS("\n-- TRK "); 
-			//doneEvents1 ||= bb;   //won't compile.
-			doneEvents1= (doneEvents1 || bb);
+			bb = _track[i].PlayTracks(this);
+			//if ((bb) && (_format != 0)) DUMPS("\n-- TRK "); 
+			doneEvents1 |= bb;   //won't compile.
+			//doneEvents1= (doneEvents1 || bb);
 		}
 
 		// When there are no more events, just break out
@@ -352,7 +400,7 @@ return true;
 
 
 
-
+/* 
 
 boolean MIDIFile::getNextEvent(void)
 {
@@ -423,7 +471,7 @@ boolean MIDIFile::getNextEvent(void)
 #endif // EVENT/TRACK_PRIORITY
 
 	return true;
-}
+} */
 
 int MIDIFile::load() 
 // load the MIDI file into memory ready for processing

@@ -52,18 +52,19 @@ void HandleNoteOn (byte commandByte, byte inNote, byte invelocity){
     switch (inNote) {
     case 12: //note value of A#3 or 0x3a    
       if (S == 0){
-        S++;
-        draw_menu();
-        MidiClockStart(true,true);
+        S=1;
+       // draw_menu();
+        MidiClockStart(true, true);
         startsignal = 1; 
       }
       else
       {
-        S--;
-        draw_menu();
+        S=0;
+        //draw_menu();
         MidiClockStop();
         startsignal = 0; 
         SMF.close(); //probably working, but the player just moves to the next song...
+        startsetup=1;
         // SMF.restart();    
     //    midiSilence();   //123	01111011	7B	[Channel Mode Message] All Notes Off	0
       }
@@ -81,7 +82,7 @@ void HandleNoteOn (byte commandByte, byte inNote, byte invelocity){
         filePOS=(P+1);
         listStart=filePOS;
         setNextSong();  //this just sets up the next song var for the draw menu function.
-       // Play_setup();
+      // Play_setup();
         draw_menu();
 
 

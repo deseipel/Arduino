@@ -73,7 +73,7 @@ void midiTimer()
     tick_count++; //COUNT THE TICKS SO YOU CAN CALCULATE HOW MUCH TIME HAS PASSED SO YOU CAN PLAY IN TIME IN THE MFTRACK CODE.
     SMF.setTickCount(tick_count);
 
-    if (sync24PPQ >= (4)) {
+    if (sync24PPQ >= (DIV)) {
 
 
       sync24PPQ = 0;    
@@ -163,8 +163,8 @@ void FileNameCheck()   //this handles setting up a file to play and also lets me
     tft.setCursor(30, 20);
     tft.print(" ");
     tft.print(nameFiles[filePOS]);
-    tft.setCursor(10, 70);
-    tft.print("restarted");
+   // tft.setCursor(10, 70);
+   // tft.print("restarted");
     //    tft.print("Tracks: ");
     //    tft.println(int(track_cnt));
 
@@ -174,17 +174,22 @@ void FileNameCheck()   //this handles setting up a file to play and also lets me
 
 bool Play_setup(){   
   int  err = -1;
-  // int tpq = SMF.getTicksPerQuarterNote();
+  
 
   FileNameCheck();
   //  load every time?  Or only if not playing (S==0) ?
 
 
-  err = SMF.load();                                              //NEED TO FIND A WAY TO PRELOAD SONGS BETTER.
-  SMF.setTempo(  bpm); //should only have to set this once.
-  track_cnt=SMF.getTrackCount();
-  // PPQ = tpq;   //may not work correctly when looping...
-  //  SMF.setTicksPerQuarterNote(PPQ);
+  err = SMF.load(); 
+ int tpq = SMF.getTicksPerQuarterNote();
+ //NEED TO FIND A WAY TO PRELOAD SONGS BETTER.
+
+ // track_cnt=SMF.getTrackCount();
+  PPQ = tpq;   //may not work correctly when looping...  a change to the PPQ affects the timer frequency. 
+    SMF.setTicksPerQuarterNote(PPQ);
+    DIV = (PPQ/24);
+      SMF.setTempo(  bpm); //should only have to set this once.
+      timerSetFrequency();
   //  
   if (err != -1)
   {
@@ -197,6 +202,7 @@ bool Play_setup(){
   //{
   // SMF.dump();
   //}
+ // draw_menu();                                       //THIS MAY BE BAD
   return (true);
 
 

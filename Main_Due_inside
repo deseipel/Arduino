@@ -1,3 +1,6 @@
+#include <Adafruit_GFX.h>
+
+#include <Adafruit_ST7735.h>
 
 
 /*
@@ -5,23 +8,25 @@
  To Do:
 
 2.   account for differnt PPQ?
-3.  track count is only right after stopping playback?
+3.  large files don't appear to play after a while (IPANEMA.MID)
 
  
  */
 #include <MIDIFile.h>
 #include <MIDIHelper.h>
-#include <Adafruit_ST7735.h>
-#include <Adafruit_GFX.h>
+
+
 #include <SdFatUtil.h>
 #include <SdFat.h>
 #include <SPI.h>
+#include <DueTimer.h>
+
 
 
 
 // Edit for Shield Pinouts!
-#define sclk 52
-#define mosi 51   
+//#define sclk 52
+//#define mosi 51   
 #define SD_CS    4  // Chip select line for SD card
 #define TFT_CS  10  // Chip select line for TFT display
 #define TFT_DC   8  // Data/command line for TFT
@@ -68,8 +73,7 @@ uint8_t track_cnt;
 //SoftwareSerial SSerial(2, 3); // RX, TX
 
 // Midi Clock  //
-int  PPQ = 96; // Min BPM = 50 //
-uint8_t DIV = (PPQ/24);
+#define PPQ  96 // Min BPM = 50 //
 volatile uint8_t  sync24PPQ = 0;
 long bpm = 100;
 long interval = (6000000/(24 * bpm));  
@@ -80,6 +84,7 @@ uint8_t midiClockType = 2; // 0=Internal Only (no Sync), 1=SyncToExternal (Slave
 volatile byte tick;
 volatile long long tick_count= 0 ;
 byte started =0;
+ byte startsetup = 1; 
 
 
 byte oldP = 1;  // a byte to compare to the new Program/patch number //
@@ -121,17 +126,33 @@ const char*  Buttons[]={
 
 
 // Check the joystick position
-int CheckJoystick()
+uint8_t CheckJoystick()
 {
-  int joystickState = analogRead(3);
+//  int joystickState = analogRead(3);
+//
+//  if (joystickState < 50) return Down;
+//  if (joystickState < 150) return Right;
+//  if (joystickState < 250) return Press;
+//  if (joystickState < 500) return Up;
+//  if (joystickState < 650) return Left;
+//  
+//
+//  return Neutral;
+//  // delay(100);
 
-  if (joystickState < 50) return Down;
-  if (joystickState < 150) return Right;
-  if (joystickState < 250) return Press;
-  if (joystickState < 500) return Up;
-  if (joystickState < 650) return Left;
-  return Neutral;
-  // delay(100);
+  float a = analogRead(3);
+  
+  a *= 3.3;
+  a /= 1024.0;
+  
+ // Serial.print("Button read analog = ");
+  //Serial.println(a);
+  if (a < 0.2) return Down;
+  if (a < 1.0) return Right;
+  if (a < 1.5) return Press;
+  if (a < 2.0) return Up;
+  if (a < 3.2) return Left;
+  else return Neutral;
 } 
 
 enum COLORS { 	
@@ -172,12 +193,13 @@ void setup(){
   pinMode(A5, OUTPUT);      // sets the digital pin as output, D19 on Rugged circuits MIDI shield = A5 on Mega.
   digitalWrite(A5, HIGH);
   tft.initR( INITR_BLACKTAB );    //  "tab color" from screen protector; there's RED and GREEN, too.
+ //tft.initR(INITR_GREENTAB);
   tft.fillScreen(ST7735_BLACK);
   tft.setTextSize(1); //  1 = 5x8, 2 = 10x16; chars leave blank pixel on bottom
   tft.println("TFT Setup Completed");
   tft.println("SD Init...");
   // Initialise SD
-  if (!SD.begin(SD_CS, SPI_FULL_SPEED))
+  if (!SD.begin(SD_CS, SPI_DIV3_SPEED))
   {
     // Serial.print("\nSD init fail!");
     tft.println("SD init fail!");
@@ -194,6 +216,8 @@ void setup(){
   setCurrentSong();
   setNextSong();
    draw_menu();
+   
+   Timer3.attachInterrupt(midiTimer);
 }
 
 
@@ -202,12 +226,16 @@ void setup(){
 void loop() {
   CheckMIDI();
   if( doMenu() ){
-//
-//    //		//  something happened with joystick, an update() action could be called here
+
+    //		//  something happened with joystick, an update() action could be called here
   }
   
-  if ((S==1) && (midiClockRunning ==1) ){
-  Playit();
-  }
+//  if ((midiClockRunning==0) && (midiClockType==2) && (S==0)) {  //starts the clock when nothing is actually playing//
+//    MidiClockStart(true, true);
+//    midiClockRunning =1;
+//  }
+ // if((S==1) && (midiClockRunning ==1) ){
+  //Playit();
+  //}
 }
 

@@ -175,7 +175,6 @@ static MENU menu[] = {
 
 MENU * curr_menu = menu;
 int menu_enable = 0;
-byte map_window,midi_window,tempo_window = 0;
 //  curr_selection is the SELECTION array index of the curr_menu
 int curr_selection = 0;
 void menu_hide( int ){ 
@@ -186,19 +185,18 @@ void menu_hide( int ){
 
 //this is the function that sets the tempo for the MIDI clock & MIDI player.
 void set_tempo(int key){
-tempo_window=1;
+
   cls();   //clears the screen
   tft.setTextColor(ST7735_WHITE);
   sprintf( textx, "\n\n\n\n\nPress %c to exit\nUse %c & %c to adjust\n", larr, uarr, darr );
   tft.print( textx );
 
 
- // for( uint8_t b = CheckJoystick(); b != Left; b = CheckJoystick() ) {   //this basically checks the joystick and as long as left isn't detected, it sets the tempo up or down.
- uint8_t b = CheckJoystick();
+  for( uint8_t b = CheckJoystick(); b != Left; b = CheckJoystick() ) {   //this basically checks the joystick and as long as left isn't detected, it sets the tempo up or down.
     tft.setTextSize(2);
     // tft.setCursor(10, 1);
-   // tft.drawRect(80, 1, 40, 16, ST7735_BLACK);
-   // tft.fillRect(80, 1 , 40, 16, ST7735_BLACK);
+    tft.drawRect(80, 1, 40, 16, ST7735_BLACK);
+    tft.fillRect(80, 1 , 40, 16, ST7735_BLACK);
     String TempoString = "Tempo: "; 
 
     String String3;  // a string so I can concat tempo char and tempo bpm
@@ -207,59 +205,45 @@ tempo_window=1;
     //sprintf( textx, String3 );
     tft.println(String3);
 
-// if (b==Neutral){     //this works but its an ugly solution.
-//     if ((S==1) && (midiClockRunning ==1) ){
-//  Playit();
-//  }}
 
     if( b == Up  )
       bpm++;
     else if( b == Down )
       bpm--;
-      else if (b==Left) tempo_window=0;
 
-  //  if( b ) // control repeat speed
-    //  delay(125);
- // } for loop end.
+ //   if( b ) // control repeat speed
+   //   delay(125);
+  }
   SMF.setTempo(bpm);   //calls the library code to set the tempo for the MIDI player, MIDI clock also uses the bpm variable.
   tft.setTextSize(1);
   //tft.setTextColor( colorsave );
-//  cls();
-//  draw_menu();   //draws the menu to refresh
+  cls();
+  draw_menu();   //draws the menu to refresh
 
 }
 
 //for all this code, all it really does right now is to switch between ON & OFF, no real functionality yet.
 void mapping_onoff(int item){
-  map_window=1;
   cls();
   tft.setTextColor(ST7735_WHITE);
   sprintf( textx, "\n\n\n\n\nPress %c to exit\nUse %c & %c to adjust\n", larr, uarr, darr );
   tft.print( textx );
   int _x = 1;
   int _y = 3;
- // for( uint8_t b = CheckJoystick(); b != Left; b = CheckJoystick() ) {
-   uint8_t b = CheckJoystick();
+  for( uint8_t b = CheckJoystick(); b != Left; b = CheckJoystick() ) {
     void* tempNum;
     int *tempI;
     tft.setCursor(_x,_y);
     sprintf( textx,  "%s:\n", _mi_list[item].label );
     tft.print(textx);
     tft.setTextSize(2);
-    //
-//     if (b==Neutral){                                                                 //this works but its an ugly solution.
-//     if ((S==1) && (midiClockRunning ==1) ){
-//  Playit();
-//  }}
-//
+
     if( _mi_list[item].datatype == OPTION || _mi_list[item].datatype == INT ) {
       tempI =  reinterpret_cast<int *>(_mi_list[item].ptrGlobal);
-      
       if( b == Up  )
         *tempI += 1;
       else if( b == Down )
         *tempI -= 1;
-        else if (b ==Left)map_window=0;
       //  ints can implement wrap... might confuse but oh well...
       if( *tempI < _mi_list[item].min ) *tempI = _mi_list[item].max;
       if( *tempI > _mi_list[item].max ) *tempI = _mi_list[item].min;
@@ -278,12 +262,12 @@ void mapping_onoff(int item){
       tft.setCursor(0,60);
       tft.print(textx);
     }
-  //  if( b ) // control repeat speed
-    //  delay(125);
- // }  end for loop
+ //   if( b ) // control repeat speed
+   //   delay(125);
+  }
   //tft.setTextColor( colorsave );
-//  cls();
- // draw_menu();
+  cls();
+  draw_menu();
 
 
   //////////////////////////////////////////////////////////////////////////////////////////////////
@@ -298,29 +282,20 @@ void clock_intext (int key){
 //  this is the function that is called when selecting a MIDI file.
 
 void select_midi(int key){
-midi_window =1; 
+
   tft.setCursor(0,60);
   if (listStart==0) listStart=1;
 
- // drawFilelist(listStart);
+  drawFilelist(listStart);
 
-//  for( uint8_t b = CheckJoystick(); b != Left   ; b = CheckJoystick() ) {
-   
-   uint8_t b = CheckJoystick();
-// if (b==Neutral){     //this works but its an ugly solution.
-//     if ((S==1) && (midiClockRunning ==1) ){
-//  Playit();
-//  }
-// }
-   
- // else  if (b == Down){
-    if(b==Down){
+  for( uint8_t b = CheckJoystick(); b != Left   ; b = CheckJoystick() ) {
+    if (b == Down){
       // filePOS = (filePOS++)%maxmidicount;  //wraps back to 0 if  = maximidicount
       filePOS = (filePOS+maxmidicount+1)%maxmidicount;
       if (filePOS==0)filePOS=1;
       listStart = filePOS;  
       setNextSong();
-     // drawFilelist(listStart);
+      drawFilelist(listStart);
       // sprintf(msg, "listStart: %d\n filePOS: %d\n fileIndex: %d\n", listStart,  filePOS, fileIndex);
       //  Serial.print(msg);
       //sychronize the MIDI file with the program change,  all these Changecontrols are necessary for the KORG ES1 for some reason.
@@ -342,7 +317,7 @@ midi_window =1;
       if (filePOS==0)filePOS=maxmidicount-1;
       setNextSong();
       listStart = filePOS;      
-     // drawFilelist(listStart);
+      drawFilelist(listStart);
 
       // sprintf(msg, "listStart: %d\n filePOS: %d\n fileIndex: %d\n", listStart,  filePOS, fileIndex);
       // Serial.print(msg);
@@ -358,19 +333,13 @@ midi_window =1;
       sendProgramChange(P,10);
       //  P=filePOS;
     }   
-    else if (b==Left){
-     midi_window=0;
-   // draw_menu(); 
-    }
- 
+    
     //
- //   if( b ) // control repeat speed
-   //   delay(125);
- // }  // end for loop
- // cls();
- // draw_menu();
- drawFilelist(listStart);
-  
+  //  if( b ) // control repeat speed
+    //  delay(125);
+  }
+  cls();
+  draw_menu();
 }
 
 //this prints all the files names, but I only want 10 at a time, for all files (scrollable list).
@@ -435,32 +404,8 @@ bool doMenu( void ){
       cls();
       draw_menu();
     }
-   
     return 0;
   }
-  //----------------------------------------------------------------------------------------
-      //check to see if MIDI File screen is active
- else if(midi_window ==1){
-    select_midi(0);
-    return true;
- }
- else if (map_window==1){
-   mapping_onoff(0);
-   return true;
- }
- 
- else  if (tempo_window==1){
-   set_tempo(0);
-   return true;
- }
-  
- 
-   
- // cls();
-// draw_menu(); 
- //   return 0;
- // }
-  
 
   //-----------------------------------------------------------------------------------------
   SELECTION *selptr = &curr_menu->selection[ curr_selection ];
@@ -547,9 +492,9 @@ void draw_menu( ){
    // tft.setTextSize(2);
     tft.println(String3);
     
-        tft.setCursor(10, 70);
-    tft.print("PPQ: ");
-    tft.println(int(SMF.getTicksPerQuarterNote()));
+ //       tft.setCursor(10, 70);
+   // tft.print("Tracks: ");
+   // tft.println(int(track_cnt));
 
     //testing
     /*    tft.setTextSize(1);

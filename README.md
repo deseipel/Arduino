@@ -12,7 +12,7 @@ Required Hardware:
 ------------------------------------------------------------------------------------------
 -MIDI Device to control
 -MIDI events you wish to map
--Arduino MEGA
+-Arduino Due
 -MIDI shield (I used Ruggeduino MIDI shield, which as of this writing has been discontinued )
 -Ada Fruit TFT/SD shield
 -Micro SD card
@@ -25,7 +25,7 @@ Required Hardware:
 
 Required Software:
 --------------------------------------------------------------------------------------------
--Arduino IDE 1.05
+-Arduino IDE 1.57
 -MIDIFile Library
 
 
@@ -40,7 +40,8 @@ Reccommended Software (for debugging)
 
 configuration instructions:
 
-
+turn MIDI shield into 3.3v compatible
+Due SPI is the 6 pin header next to the cpu, use that. (HDW serial)
 
 
 

@@ -50,25 +50,26 @@ void HandleNoteOn (byte commandByte, byte inNote, byte invelocity){
 
   if (invelocity>0){ //needs to be greater than zero, not equal to,
     switch (inNote) {
-    case 12: //note value of A#3 or 0x3a    
+    case 60: //note value of A#3 or 0x3a    
       if (S == 0){
-        S++;
-        draw_menu();
-        MidiClockStart(true,true);
+        S=1;
+       // draw_menu();
+        MidiClockStart(true, true);
         startsignal = 1; 
       }
       else
       {
-        S--;
-        draw_menu();
+        S=0;
+        //draw_menu();
         MidiClockStop();
         startsignal = 0; 
         SMF.close(); //probably working, but the player just moves to the next song...
+        startsetup=1;
         // SMF.restart();    
     //    midiSilence();   //123	01111011	7B	[Channel Mode Message] All Notes Off	0
       }
       break;
-    case 13: //note value of C4  or 0x3C, handles program change 'up'
+    case 62: //note value of C4  or 0x3C, handles program change 'up'
       if (P == maxmidicount-2){    //this notes that the program is at the highest of 127 and needs reset to 0
         P=0;
         sendChangeControl(99,05,10);  //double check these control change msgs
@@ -81,7 +82,7 @@ void HandleNoteOn (byte commandByte, byte inNote, byte invelocity){
         filePOS=(P+1);
         listStart=filePOS;
         setNextSong();  //this just sets up the next song var for the draw menu function.
-       // Play_setup();
+      // Play_setup();
         draw_menu();
 
 
@@ -106,7 +107,7 @@ void HandleNoteOn (byte commandByte, byte inNote, byte invelocity){
   
       }
       break;
-    case 14: // note value of D4  or 0x3E, handles program change 'down'.
+    case 64: // note value of D4  or 0x3E, handles program change 'down'.
       if (P== 0){
         P=maxmidicount-2;
         sendChangeControl(99,05,10);
@@ -157,7 +158,7 @@ void HandleNoteOn (byte commandByte, byte inNote, byte invelocity){
 
       }
       break;
-    case 15:		//part 1 mute, M variable tells us if it's muted already;  all these mutes actually set the volume to zero, uses the volume NRPNs!
+    case 66:		//part 1 mute, M variable tells us if it's muted already;  all these mutes actually set the volume to zero, uses the volume NRPNs!
       if (M1==0) {
         sendChangeControl(99,5,10);
         sendChangeControl(98,1,10);
@@ -173,7 +174,7 @@ void HandleNoteOn (byte commandByte, byte inNote, byte invelocity){
       }
 
       break;
-    case 16:
+    case 68:
       if (M2==0) {
         sendChangeControl(99,5,10);
         sendChangeControl(98,9,10);
@@ -188,7 +189,7 @@ void HandleNoteOn (byte commandByte, byte inNote, byte invelocity){
         M2=0;
       }
       break;
-    case 17:   //mute for part 3
+    case 70:   //mute for part 3
       if (M3==0) {
         sendChangeControl(99,5,10);
         sendChangeControl(98,17,10);
@@ -203,7 +204,7 @@ void HandleNoteOn (byte commandByte, byte inNote, byte invelocity){
         M3=0;
       }
       break;
-    case 18:
+    case 72:
       if (M4==0) {
         sendChangeControl(99,5,10);
         sendChangeControl(98,25,10);
@@ -218,7 +219,7 @@ void HandleNoteOn (byte commandByte, byte inNote, byte invelocity){
         M4=0;
       }
       break;
-    case 19:
+    case 74:
       if (M5==0) {
         sendChangeControl(99,5,10);
         sendChangeControl(98,33,10);
@@ -233,7 +234,7 @@ void HandleNoteOn (byte commandByte, byte inNote, byte invelocity){
         M5=0;
       }
       break;
-    case 20:
+    case 76:
       if (M6a==0) {
         sendChangeControl(99,5,10);
         sendChangeControl(98,41,10);
@@ -248,7 +249,7 @@ void HandleNoteOn (byte commandByte, byte inNote, byte invelocity){
         M6a=0;
       }
       break;
-    case 21:
+    case 78:
       if (M6b==0) {
         sendChangeControl(99,5,10);
         sendChangeControl(98,49,10);
@@ -263,7 +264,7 @@ void HandleNoteOn (byte commandByte, byte inNote, byte invelocity){
         M6b=0;
       }
       break;
-    case 22:
+    case 80:
       if (M7a==0) {
         sendChangeControl(99,5,10);
         sendChangeControl(98,57,10);
@@ -278,7 +279,7 @@ void HandleNoteOn (byte commandByte, byte inNote, byte invelocity){
         M7a=0;
       }
       break;
-    case 23:
+    case 82:
       if (M7b==0) {
         sendChangeControl(99,5,10);
         sendChangeControl(98,65,10);
@@ -303,40 +304,40 @@ void HandleNoteOn (byte commandByte, byte inNote, byte invelocity){
 
   else{
     switch(inNote){
-    case 12:
+    case 60:
       sendNoteOff(12,0,10);
       break;
-    case 13:
+    case 62:
       sendNoteOff(13,0,10);
       break;
-    case 14:
+    case 64:
       sendNoteOff(14,0, 10);
       break;   
-    case 15:
+    case 66:
       sendNoteOff(15,0, 10);
       break;      
-    case 16:
+    case 68:
       sendNoteOff(16,0, 10);
       break;      
-    case 17:
+    case 70:
       sendNoteOff(17,0, 10);
       break;      
-    case 18:
+    case 72:
       sendNoteOff(18,0, 10);
       break;      
-    case 19:
+    case 74:
       sendNoteOff(19,0, 10);
       break;      
-    case 20:
+    case 76:
       sendNoteOff(21,0, 10);
       break;   
-    case 21:
+    case 78:
       sendNoteOff(21,0, 10);
       break;      
-    case 22:
+    case 80:
       sendNoteOff(22,0, 10);
       break;     
-    case 23:
+    case 82:
       sendNoteOff(23,0, 10);
       break;            
 
